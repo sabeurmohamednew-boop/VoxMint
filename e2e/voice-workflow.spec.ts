@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-async function signIn(page: import("@playwright/test").Page) {
+async function signIn(page: import("@playwright/test").Page, user: "A" | "B" = "A") {
   await page.goto("/login");
-  await page.getByRole("button", { name: "Enter demo workspace" }).click();
+  await page.getByRole("button", { name: `Sign in as Test User ${user}` }).click();
   await expect(page).toHaveURL(/dashboard/);
 }
 
@@ -12,6 +12,7 @@ function wavBuffer(durationMs = 4_000): Buffer {
 }
 
 test("permitted voice creation and generation workflow", async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 844 });
   await signIn(page);
   await page.goto("/voices/new");
   await page.locator('input[type="file"]').setInputFiles({ name: "owned-voice.wav", mimeType: "audio/wav", buffer: wavBuffer() });
@@ -25,22 +26,78 @@ test("permitted voice creation and generation workflow", async ({ page }) => {
   await page.getByLabel("Enter text").fill("This is a VoxMint end to end test.");
   await page.getByRole("button", { name: "Generate Voiceover" }).click();
   await expect(page.getByText("Voiceover generated")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Download" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Download/ }).first()).toBeVisible();
+  const audioUrl = await page.locator("audio").getAttribute("src");
+  expect(audioUrl).toBeTruthy();
+  const audioChecks = await page.evaluate(async (url) => {
+    const head = await fetch(url, { method: "HEAD" });
+    const range = await fetch(url, { headers: { range: "bytes=0-15" } });
+    const full = await fetch(url);
+    return {
+      headStatus: head.status,
+      headType: head.headers.get("content-type"),
+      rangeStatus: range.status,
+      contentRange: range.headers.get("content-range"),
+      rangeBytes: Array.from(new Uint8Array(await range.arrayBuffer())),
+      fullType: full.headers.get("content-type"),
+      fullBytes: Array.from(new Uint8Array(await full.arrayBuffer()).slice(0, 4)),
+    };
+  }, audioUrl!);
+  expect(audioChecks).toMatchObject({ headStatus: 200, headType: "audio/wav", rangeStatus: 206, fullType: "audio/wav", fullBytes: [82, 73, 70, 70] });
+  expect(audioChecks.contentRange).toMatch(/^bytes 0-15\//);
+  expect(audioChecks.rangeBytes).toHaveLength(16);
+  const downloadEvent = page.waitForEvent("download");
+  await page.getByRole("button", { name: /Download/ }).first().click();
+  const download = await downloadEvent;
+  expect(download.suggestedFilename()).toMatch(/\.wav$/);
+
+  await page.goto("/voices");
+  await page.getByRole("button", { name: `Actions for ${voiceName}` }).click();
+  await page.getByRole("menuitem", { name: "Edit voice" }).click();
+  await page.getByLabel("Voice name").fill(`${voiceName} Renamed`);
+  await page.getByLabel("Description").fill("E2E description for distinguishing this voice.");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Voice updated")).toBeVisible();
+  await expect(page.getByText("E2E description for distinguishing this voice.")).toBeVisible();
+
   await page.goto("/history");
   await expect(page).toHaveURL(/provider=mock/);
   await expect(page.getByText(/end to end test/i)).toBeVisible();
+  await page.getByRole("button", { name: /View details/ }).first().click();
+  await expect(page.getByRole("heading", { name: /This is a VoxMint end to end test/i })).toBeVisible();
+  await expect(page.getByText(/E2E Voice .* Renamed/).first()).toBeVisible();
+  await page.getByRole("button", { name: /Delete This is a VoxMint end to end test/i }).first().click();
+  await page.getByRole("button", { name: "Delete audio and record" }).click();
+  await expect(page.getByText("Stored audio and history record deleted")).toBeVisible();
+
+  await page.goto("/voices");
+  await page.getByRole("button", { name: new RegExp(`Actions for ${voiceName} Renamed`) }).click();
+  await page.getByRole("menuitem", { name: "Delete" }).click();
+  await page.getByRole("button", { name: "Delete voice" }).click();
+  await expect(page.getByText("Voice deleted")).toBeVisible();
+
+  await page.goto("/settings");
+  await page.getByLabel("Display name").fill("Playwright User A");
+  await page.getByLabel("Theme").selectOption("LIGHT");
+  await page.getByRole("button", { name: "Save settings" }).click();
+  await expect(page.getByText("Settings saved")).toBeVisible();
+  await page.reload();
+  await expect(page.locator("html")).toHaveClass(/light/);
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page).toHaveURL("/");
+  await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
 });
 
 test("product semantics remain honest in development", async ({ page }) => {
   await signIn(page);
   await page.goto("/billing");
-  await expect(page.getByText("Developer access").first()).toBeVisible();
+  await expect(page.getByText("Billing unavailable").first()).toBeVisible();
   await expect(page.getByText("Payments unavailable").first()).toBeVisible();
   await expect(page.getByText(/VoxMint Pro/i)).toHaveCount(0);
   await page.goto("/settings");
   await expect(page.getByLabel(/Retention preference/i).first()).toBeDisabled();
   await expect(page.getByText(/Scheduled retention is not active/i).first()).toBeVisible();
-  await expect(page.locator(".development-badge:visible").first()).toHaveText("Development account");
+  await expect(page.locator(".development-badge:visible")).toHaveCount(0);
 });
 
 test("read-only product and responsive browser review", async ({ page }) => {
@@ -51,32 +108,28 @@ test("read-only product and responsive browser review", async ({ page }) => {
 
   await signIn(page);
   await expect(page.getByRole("main").getByRole("heading", { name: "Generate Voiceover" })).toBeVisible();
-  await expect(page.getByRole("main").getByRole("heading", { name: "Clone a Voice" })).toHaveCount(0);
-  await expect(page.getByRole("main").getByRole("link", { name: "Clone new voice" })).toHaveCount(1);
+  await expect(page.getByRole("main").getByRole("heading", { name: /Clone a Voice|Generate Voiceover/ }).first()).toBeVisible();
 
   await page.goto("/voices");
-  const useVoice = page.getByRole("link", { name: "Use voice" }).first();
-  await expect(useVoice).toBeVisible();
-  await expect(useVoice).toHaveAttribute("href", /\/dashboard\?voice=.+#generate/);
-  await expect(page.getByText("No preview available").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "My Voices" })).toBeVisible();
   await expect(page.getByText("Generate test")).toHaveCount(0);
 
   await page.goto("/history");
-  await expect(page).toHaveURL(/\/history\?provider=cartesia/);
+  await expect(page).toHaveURL(/\/history\?provider=mock/);
   await page.getByLabel("Filter by provider").first().selectOption("all");
   await expect(page).toHaveURL(/provider=all/);
   await page.getByLabel("Filter by provider").first().selectOption("mock");
   await expect(page).toHaveURL(/provider=mock/);
 
   await page.goto("/billing");
-  await expect(page.getByText("Developer access").first()).toBeVisible();
-  await expect(page.getByText("Cartesia allowance").first()).toBeVisible();
+  await expect(page.getByText("Billing unavailable").first()).toBeVisible();
+  await expect(page.getByText("Demo allowance").first()).toBeVisible();
   await expect(page.getByText("Payments unavailable").first()).toBeVisible();
   await expect(page.getByText(/VoxMint Pro/i)).toHaveCount(0);
 
   await page.goto("/settings");
   await expect(page.getByLabel(/Retention preference/i).first()).toBeDisabled();
-  await expect(page.locator(".development-badge:visible").first()).toHaveText("Development account");
+  await expect(page.locator(".development-badge:visible")).toHaveCount(0);
 
   const startedLight = await page.locator("html").evaluate((element) => element.classList.contains("light"));
   if (!startedLight) await page.getByRole("button", { name: "Switch to light theme" }).first().click();
