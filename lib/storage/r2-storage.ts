@@ -7,9 +7,8 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getEnv } from "@/lib/config/env";
-import type { ObjectStorage, PutObjectInput } from "@/lib/storage/object-storage";
+import type { ObjectByteRange, ObjectStorage, PutObjectInput } from "@/lib/storage/object-storage";
 
 export class R2ObjectStorage implements ObjectStorage {
   private readonly client: S3Client;
@@ -44,21 +43,26 @@ export class R2ObjectStorage implements ObjectStorage {
     return { key: input.key, size: input.bytes.byteLength, contentType: input.contentType };
   }
 
-  async get(key: string) {
-    const response = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
-    if (!response.Body) throw new Error("Stored object has no body.");
+  async head(key: string) {
+    const response = await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }));
     return {
-      bytes: await response.Body.transformToByteArray(),
+      size: Number(response.ContentLength ?? 0),
       contentType: response.ContentType ?? "application/octet-stream",
     };
   }
 
-  async getSignedReadUrl(key: string, expiresInSeconds: number) {
-    return getSignedUrl(
-      this.client,
-      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
-      { expiresIn: expiresInSeconds },
-    );
+  async open(key: string, range?: ObjectByteRange) {
+    const response = await this.client.send(new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      Range: range ? `bytes=${range.start}-${range.end}` : undefined,
+    }));
+    if (!response.Body) throw new Error("Stored object has no body.");
+    return {
+      body: response.Body.transformToWebStream(),
+      size: Number(response.ContentLength ?? 0),
+      contentType: response.ContentType ?? "application/octet-stream",
+    };
   }
 
   async delete(key: string) {

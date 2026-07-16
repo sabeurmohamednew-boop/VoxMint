@@ -17,9 +17,10 @@ export function voiceDto(voice: Voice): VoiceDto {
 
 type GenerationWithVoice = Generation & { voice: Pick<Voice, "name"> };
 
-export function generationDto(generation: GenerationWithVoice): GenerationDto {
+export function generationDto(generation: GenerationWithVoice, audioAvailable = generation.status === "READY"): GenerationDto {
   return {
     id: generation.id,
+    provider: generation.provider === "cartesia" ? "cartesia" : "mock",
     voiceId: generation.voiceId,
     voiceName: generation.voice.name,
     title: generation.title,
@@ -32,9 +33,9 @@ export function generationDto(generation: GenerationWithVoice): GenerationDto {
     createdAt: generation.createdAt.toISOString(),
     completedAt: generation.completedAt?.toISOString() ?? null,
     errorMessageSafe: generation.errorMessageSafe,
-    audioUrl:
-      generation.status === "READY"
-        ? `/api/generations/${generation.id}/audio`
-        : null,
+    audioUrl: generation.status === "READY" && audioAvailable
+      ? `/api/generation-audio/${generation.id}`
+      : null,
+    audioAvailable: generation.status === "READY" && audioAvailable,
   };
 }

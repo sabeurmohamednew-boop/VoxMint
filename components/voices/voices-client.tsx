@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/toast";
 import { fetchJson } from "@/lib/api/client";
 import { isVoiceCompatibleWithProvider } from "@/lib/providers/compatibility";
 import type { ProviderInfoDto, VoiceDto } from "@/lib/types/dto";
+import { formatDate } from "@/lib/date";
 
 export function VoicesClient({
   initialVoices,
@@ -148,7 +149,7 @@ export function VoicesClient({
                 </div>
                 {voice.description && <p className="mt-4 line-clamp-2 text-xs leading-5 text-[var(--foreground-secondary)]">{voice.description}</p>}
                 <div className="mt-5 flex items-center justify-between border-t border-[var(--border-subtle)] pt-4 text-[11px] text-[var(--muted)]">
-                  <span>Created {new Date(voice.createdAt).toLocaleDateString()}</span>
+                  <span>Created {formatDate(voice.createdAt)}</span>
                   <span>{Math.round(voice.sourceDurationMs / 100) / 10}s sample</span>
                 </div>
               </article>

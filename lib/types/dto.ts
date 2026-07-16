@@ -15,6 +15,7 @@ export type ProviderInfoDto = {
   name: "mock" | "cartesia";
   label: "Demo Provider" | "Cartesia";
   isDemo: boolean;
+  showBranding: boolean;
   capabilities: {
     instantClone: boolean;
     multilingual: boolean;
@@ -23,6 +24,7 @@ export type ProviderInfoDto = {
 
 export type GenerationDto = {
   id: string;
+  provider: "mock" | "cartesia";
   voiceId: string;
   voiceName: string;
   title: string | null;
@@ -36,12 +38,15 @@ export type GenerationDto = {
   completedAt: string | null;
   errorMessageSafe: string | null;
   audioUrl: string | null;
+  audioAvailable: boolean;
 };
 
 export type UsageDto = {
   plan: "FREE" | "PRO";
+  activeProvider: "mock" | "cartesia";
   periodKey: string;
   charactersUsed: number;
+  demoCharactersUsed: number;
   characterLimit: number;
   voicesUsed: number;
   voiceLimit: number;

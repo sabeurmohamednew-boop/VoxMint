@@ -9,6 +9,7 @@ export function toPublicProviderInfo(
     name: provider.name,
     label: isDemo ? "Demo Provider" : "Cartesia",
     isDemo,
+    showBranding: true,
     capabilities: {
       instantClone: provider.capabilities.instantClone,
       multilingual: provider.capabilities.multilingual,

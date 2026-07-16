@@ -31,5 +31,6 @@ export function DashboardClient({ initialVoices, initialGeneration, usage, provi
     catch (error) { showToast(error instanceof Error ? error.message : "Delete failed.", "error"); }
   }
 
-  return <><div className="dashboard-grid"><CloneVoicePanel onCreated={created} /><GenerateVoicePanel voices={voices} selectedVoiceId={selectedId} onSelectedVoice={selectVoice} generation={generation} onGenerated={setGeneration} onDeleted={(item) => void deleteGeneration(item)} usage={usage} providerInfo={providerInfo} /></div><RecentVoices voices={voices} selectedId={selectedId} onSelect={selectVoice} onDelete={deletedVoice} onGenerated={setGeneration} providerInfo={providerInfo} /></>;
+  const generatePanel = <GenerateVoicePanel voices={voices} selectedVoiceId={selectedId} onSelectedVoice={selectVoice} generation={generation} onGenerated={setGeneration} onDeleted={(item) => void deleteGeneration(item)} usage={usage} providerInfo={providerInfo} />;
+  return <><div className={`dashboard-grid ${voices.length ? "returning" : ""}`}>{voices.length ? <>{generatePanel}<CloneVoicePanel onCreated={created} /></> : <><CloneVoicePanel onCreated={created} />{generatePanel}</>}</div><RecentVoices voices={voices} selectedId={selectedId} onSelect={selectVoice} onDelete={deletedVoice} onGenerated={setGeneration} providerInfo={providerInfo} /></>;
 }

@@ -17,5 +17,5 @@ export function getVoiceProvider(): VoiceProvider {
 }
 
 export function getPublicProviderInfo(): ProviderInfoDto {
-  return toPublicProviderInfo(getVoiceProvider());
+  return { ...toPublicProviderInfo(getVoiceProvider()), showBranding: getEnv().SHOW_PROVIDER_BRANDING };
 }

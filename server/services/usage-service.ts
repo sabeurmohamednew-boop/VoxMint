@@ -16,9 +16,16 @@ export function currentPeriodKey(date = new Date()): string {
 export async function getUsage(userId: string): Promise<UsageDto> {
   const periodKey = currentPeriodKey();
   const provider = getVoiceProvider();
-  const [user, usage, voicesUsed] = await Promise.all([
+  const [user, activeUsage, demoUsage, voicesUsed] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
-    prisma.monthlyUsage.findUnique({ where: { userId_periodKey: { userId, periodKey } } }),
+    prisma.usageLedger.aggregate({
+      where: { userId, periodKey, type: "TTS_CHARACTERS", status: "COMMITTED", generation: { provider: provider.name } },
+      _sum: { quantity: true },
+    }),
+    prisma.usageLedger.aggregate({
+      where: { userId, periodKey, type: "TTS_CHARACTERS", status: "COMMITTED", generation: { provider: "mock" } },
+      _sum: { quantity: true },
+    }),
     prisma.voice.count({
       where: {
         userId,
@@ -31,8 +38,10 @@ export async function getUsage(userId: string): Promise<UsageDto> {
   const limits = planLimits[user.plan];
   return {
     plan: user.plan,
+    activeProvider: provider.name,
     periodKey,
-    charactersUsed: usage?.charactersUsed ?? 0,
+    charactersUsed: activeUsage._sum.quantity ?? 0,
+    demoCharactersUsed: demoUsage._sum.quantity ?? 0,
     characterLimit: limits.characters,
     voicesUsed,
     voiceLimit: limits.voices,

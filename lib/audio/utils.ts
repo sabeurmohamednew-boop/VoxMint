@@ -35,6 +35,7 @@ export function safeBaseName(value: string, fallback = "audio"): string {
   return normalized || fallback;
 }
 
-export function downloadFileName(voiceName: string, date = new Date()): string {
-  return `${safeBaseName(voiceName, "voxmint")}-${date.toISOString().slice(0, 10)}.wav`;
+export function downloadFileName(voiceName: string, mimeType = "audio/wav", date = new Date()): string {
+  const extension = extensionForMime(mimeType) ?? "audio";
+  return `${safeBaseName(voiceName, "voxmint")}-${date.toISOString().slice(0, 10)}.${extension}`;
 }

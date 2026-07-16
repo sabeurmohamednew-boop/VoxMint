@@ -53,6 +53,10 @@ export const envSchema = z
     VOICE_SAMPLE_MAX_SECONDS: positiveInteger(10),
     VOICE_SAMPLE_MAX_BYTES: positiveInteger(10 * 1024 * 1024),
     GENERATION_MAX_CHARACTERS: positiveInteger(5000),
+    SUPPORT_EMAIL: optionalEnvString(z.string().email()),
+    ABUSE_REPORT_URL: optionalEnvString(z.string().url()),
+    RETENTION_WORKER_ENABLED: booleanString,
+    SHOW_PROVIDER_BRANDING: z.enum(["true", "false"]).default("true").transform((value) => value === "true"),
   })
   .superRefine((env, context) => {
     if (env.VOICE_SAMPLE_MIN_SECONDS >= env.VOICE_SAMPLE_MAX_SECONDS) {
@@ -181,4 +185,14 @@ export function getEnv(): AppEnv {
 export function isDemoAuthEnabled(): boolean {
   const env = getEnv();
   return env.NODE_ENV !== "production" && env.DEV_BYPASS_AUTH;
+}
+
+export function getPublicOperationsInfo() {
+  const env = getEnv();
+  return {
+    developmentSession: env.NODE_ENV !== "production" && env.DEV_BYPASS_AUTH,
+    retentionWorkerEnabled: env.RETENTION_WORKER_ENABLED,
+    supportEmail: env.SUPPORT_EMAIL ?? null,
+    abuseReportUrl: env.ABUSE_REPORT_URL ?? null,
+  } as const;
 }

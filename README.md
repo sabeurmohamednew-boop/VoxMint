@@ -86,7 +86,7 @@ Important locations:
 
 5. Open `http://localhost:3000/login` and choose **Enter demo workspace**.
 
-The seed creates a synthetic demo user, three fictional mock voices, and generated tone-based WAV examples. It does not contain a real person’s voice or copyrighted audio.
+When `VOICE_PROVIDER=mock`, the seed creates a synthetic demo user and fictional mock voices. In Cartesia mode it skips mock voice records, so fake voices are not mixed into a real provider workspace.
 
 ## Environment variables
 
@@ -126,6 +126,12 @@ Limits:
 
 - `VOICE_SAMPLE_MIN_SECONDS`, `VOICE_SAMPLE_MAX_SECONDS`, `VOICE_SAMPLE_MAX_BYTES`
 - `GENERATION_MAX_CHARACTERS`
+
+Operations and disclosure:
+
+- `SUPPORT_EMAIL`, `ABUSE_REPORT_URL`: optional monitored operator channels shown on Help & Safety
+- `RETENTION_WORKER_ENABLED`: keep `false` unless a real scheduled deletion worker is deployed
+- `SHOW_PROVIDER_BRANDING`: controls the optional Cartesia badge; demo mode is always disclosed
 
 ## Google OAuth
 
@@ -172,7 +178,7 @@ R2_BUCKET=voxmint-audio
 R2_ENDPOINT=https://ACCOUNT_ID.r2.cloudflarestorage.com
 ```
 
-Objects are stored under `users/{userId}/generations/{generationId}/audio.{extension}`. Bucket URLs remain private. Audio is returned through an ownership-checked route or a short-lived signed URL.
+Objects are stored under `users/{userId}/generations/{generationId}/audio.{extension}`. Bucket URLs remain private. Audio is streamed through an ownership-checked route with `HEAD` and single-range request support.
 
 ## Commands
 
@@ -190,7 +196,10 @@ npm run db:migrate   # apply a development migration
 npm run db:deploy    # apply committed migrations in production
 npm run db:seed      # seed synthetic mock data
 npm run db:studio    # Prisma Studio
+npm run db:cleanup-demo # dry-run report for safely removable, unreferenced demo voices
 ```
+
+`npm run db:cleanup-demo -- --apply` only soft-deletes unreferenced mock voices, only outside production, and only while Cartesia is active. It never deletes generations, referenced voices, real Cartesia voices, or user accounts.
 
 Playwright needs an initialized PostgreSQL database. Set `TEST_DATABASE_URL` to an isolated migrated test database before running `npm run test:e2e`; tests never call paid Cartesia APIs.
 
@@ -201,7 +210,7 @@ Playwright needs an initialized PostgreSQL database. Set `TEST_DATABASE_URL` to 
 - Uploads are capped, magic-byte detected, decoded, duration checked, and never executed.
 - Source samples are not retained after provider cloning.
 - Usage is reserved and committed in serializable database transactions, then released on provider or storage failure.
-- Generated audio is stored outside PostgreSQL and delivered with private, no-store semantics.
+- Generated audio is stored outside PostgreSQL and streamed through an authenticated, private, no-store endpoint with byte-range support.
 - Scripts, audio, credentials, raw provider responses, OAuth tokens, and signed URLs are excluded from structured logs.
 - Local storage, in-memory rate limiting, demo auth, and the mock provider are development tools—not multi-instance production controls.
 - The consent checkbox records the user’s assertion; it does not prove or replace permission.
@@ -213,7 +222,7 @@ For Vercel, provision PostgreSQL (for example Neon), R2, Upstash Redis, Google O
 ## Known limitations
 
 - Online upgrades are intentionally unavailable until a payment provider is integrated.
-- Retention preferences are stored, but scheduled deletion needs a production cron/queue worker.
+- Automated retention stays disabled in the UI unless `RETENTION_WORKER_ENABLED=true`; enabling that flag is only honest when a production cron/queue worker exists.
 - TTS currently uses the regular bytes endpoint; WebSocket streaming is an extension point, not an MVP dependency.
 - Clone and generation calls are synchronous within a request. A durable queue is recommended for higher-volume deployments.
 - API list endpoints cap results at 100; UI search/filtering operates on the loaded set. Add cursor controls when accounts can exceed that scale.

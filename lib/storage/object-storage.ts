@@ -6,13 +6,18 @@ export type PutObjectInput = {
 };
 
 export type StoredObject = { key: string; size: number; contentType: string };
+export type ObjectByteRange = { start: number; end: number };
+export type StoredObjectMetadata = { size: number; contentType: string };
+export type StoredObjectStream = StoredObjectMetadata & {
+  body: ReadableStream<Uint8Array>;
+};
 
 export interface ObjectStorage {
   put(input: PutObjectInput): Promise<StoredObject>;
-  get(key: string): Promise<{ bytes: Uint8Array; contentType: string }>;
-  getSignedReadUrl(key: string, expiresInSeconds: number): Promise<string | null>;
+  head(key: string): Promise<StoredObjectMetadata>;
+  open(key: string, range?: ObjectByteRange): Promise<StoredObjectStream>;
   delete(key: string): Promise<void>;
-  exists?(key: string): Promise<boolean>;
+  exists(key: string): Promise<boolean>;
 }
 
 export function generationStorageKey(

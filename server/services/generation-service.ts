@@ -26,7 +26,12 @@ export async function listGenerations(userId: string, limit = 50): Promise<Gener
     orderBy: { createdAt: "desc" },
     take: Math.min(limit, 100),
   });
-  return generations.map(generationDto);
+  const storage = getObjectStorage();
+  return Promise.all(generations.map(async (generation) => {
+    const audioAvailable = generation.status === "READY" && Boolean(generation.storageKey) &&
+      await storage.exists(generation.storageKey!).catch(() => false);
+    return generationDto(generation, audioAvailable);
+  }));
 }
 
 async function measuredDuration(bytes: Uint8Array, mimeType: string): Promise<number | null> {
@@ -75,6 +80,7 @@ export async function generateForUser(userId: string, unknownInput: unknown): Pr
           periodKey,
           type: "TTS_CHARACTERS",
           status: { in: ["RESERVED", "COMMITTED"] },
+          generation: { provider: provider.name },
         },
         _sum: { quantity: true },
       });

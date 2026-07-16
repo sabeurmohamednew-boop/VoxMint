@@ -4,6 +4,7 @@ import { fileTypeFromBuffer } from "file-type";
 import { parseBuffer } from "music-metadata";
 import { AppError } from "@/lib/api/response";
 import { getEnv } from "@/lib/config/env";
+import { detectAudioSignature, signatureMatchesMime } from "@/lib/audio/signature";
 
 const SUPPORTED_TYPES = new Set([
   "audio/flac",
@@ -84,5 +85,8 @@ export function validateGeneratedAudio(bytes: Uint8Array, mimeType: string): voi
   }
   if (!new Set(["audio/wav", "audio/mpeg"]).has(mimeType)) {
     throw new AppError("INVALID_PROVIDER_AUDIO", "The audio provider returned an unsupported format.", 502);
+  }
+  if (!signatureMatchesMime(detectAudioSignature(bytes.subarray(0, 16)), mimeType)) {
+    throw new AppError("INVALID_PROVIDER_AUDIO", "The audio provider returned invalid audio data.", 502);
   }
 }

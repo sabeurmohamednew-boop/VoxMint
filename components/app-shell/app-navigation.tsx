@@ -46,9 +46,9 @@ export function AppSidebar() {
       <NavItems />
       <div className="mt-auto px-5 pb-5">
         <div className="panel-quiet p-4">
-          <div className="flex items-center gap-2 text-[#a36afb]"><Crown className="h-5 w-5 text-[#f4ac52]" /><span className="font-semibold">Go Pro</span></div>
-          <p className="mt-3 text-[12.5px] leading-5 text-[var(--foreground-secondary)]">More voices, longer scripts, and higher monthly usage.</p>
-          <Link href="/billing" className="button-primary mt-4 w-full min-h-[40px]">View plans</Link>
+          <div className="flex items-center gap-2 text-[#a36afb]"><Crown className="h-5 w-5 text-[#f4ac52]" /><span className="font-semibold">Plans &amp; usage</span></div>
+          <p className="mt-3 text-[12.5px] leading-5 text-[var(--foreground-secondary)]">Review limits and deployment billing status.</p>
+          <Link href="/billing" className="button-secondary mt-4 w-full min-h-[40px]">Billing details</Link>
         </div>
       </div>
       <div className="border-t border-[var(--border-subtle)] px-5 py-4">

@@ -8,6 +8,7 @@ import { formatDuration } from "@/lib/audio/utils";
 import type { VoiceDto } from "@/lib/types/dto";
 import { voiceNameSchema } from "@/lib/validation/schemas";
 import { useToast } from "@/components/ui/toast";
+import { LocalAudioPreview } from "@/components/audio/local-audio-preview";
 
 type Phase = "idle" | "selected" | "client-validating" | "uploading" | "cloning" | "saving" | "success" | "error";
 type State = { phase: Phase; file: File | null; error: string | null };
@@ -122,7 +123,7 @@ export function CloneVoicePanel({ onCreated }: { onCreated: (voice: VoiceDto) =>
         ) : (
           <div className="panel-quiet p-4">
             <div className="flex items-start gap-3"><span className="voice-avatar h-10 w-10"><FileAudio className="h-5 w-5" /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{state.file.name.replace(/[<>:"/\\|?*]/g, "")}</p><p className="mt-0.5 text-xs text-[var(--muted)]">{humanSize(state.file.size)}{duration !== null ? ` · ${formatDuration(duration)}` : ""}</p></div><button type="button" className="button-ghost min-h-9 px-2" onClick={() => dispatch({ type: "remove" })} aria-label="Remove selected sample"><Trash2 className="h-4 w-4" /></button></div>
-            {previewUrl && <audio className="mt-3 w-full" controls preload="metadata" src={previewUrl} onLoadedMetadata={(event) => setDuration(Math.round(event.currentTarget.duration * 1000))} />}
+            {previewUrl && <LocalAudioPreview src={previewUrl} onDuration={setDuration} />}
             <button type="button" className="button-secondary mt-3 min-h-[38px] px-3" onClick={() => inputRef.current?.click()}><RotateCcw className="h-4 w-4" />Replace</button>
           </div>
         )}

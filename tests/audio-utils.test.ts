@@ -11,6 +11,7 @@ describe("audio utilities", () => {
   });
   it("creates filesystem-safe download names", () => {
     expect(safeBaseName("Maya's <Studio> Voice")).toBe("mayas-studio-voice");
-    expect(downloadFileName("Maya Voice", new Date("2026-07-16T10:00:00Z"))).toBe("maya-voice-2026-07-16.wav");
+    expect(downloadFileName("Maya Voice", "audio/wav", new Date("2026-07-16T10:00:00Z"))).toBe("maya-voice-2026-07-16.wav");
+    expect(downloadFileName("Maya Voice", "audio/mpeg", new Date("2026-07-16T10:00:00Z"))).toBe("maya-voice-2026-07-16.mp3");
   });
 });

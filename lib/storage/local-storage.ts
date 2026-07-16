@@ -1,9 +1,11 @@
 import "server-only";
 
+import { createReadStream } from "node:fs";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { Readable } from "node:stream";
 import path from "node:path";
 import { getEnv } from "@/lib/config/env";
-import type { ObjectStorage, PutObjectInput } from "@/lib/storage/object-storage";
+import type { ObjectByteRange, ObjectStorage, PutObjectInput } from "@/lib/storage/object-storage";
 
 function assertKey(key: string): void {
   if (!/^[a-zA-Z0-9/_\-.]+$/.test(key) || key.includes("..") || path.isAbsolute(key)) {
@@ -38,17 +40,24 @@ export class LocalObjectStorage implements ObjectStorage {
     return { key: input.key, size: input.bytes.byteLength, contentType: input.contentType };
   }
 
-  async get(key: string) {
+  async head(key: string) {
     const target = this.resolve(key);
-    const [bytes, metadata] = await Promise.all([
-      readFile(target),
+    const [info, metadata] = await Promise.all([
+      stat(target),
       readFile(`${target}.meta.json`, "utf8").then((value) => JSON.parse(value) as { contentType: string }),
     ]);
-    return { bytes: new Uint8Array(bytes), contentType: metadata.contentType };
+    return { size: Number(info.size), contentType: metadata.contentType };
   }
 
-  async getSignedReadUrl() {
-    return null;
+  async open(key: string, range?: ObjectByteRange) {
+    const target = this.resolve(key);
+    const metadata = await this.head(key);
+    const stream = createReadStream(target, range ? { start: range.start, end: range.end } : undefined);
+    return {
+      body: Readable.toWeb(stream) as ReadableStream<Uint8Array>,
+      size: range ? range.end - range.start + 1 : metadata.size,
+      contentType: metadata.contentType,
+    };
   }
 
   async delete(key: string) {

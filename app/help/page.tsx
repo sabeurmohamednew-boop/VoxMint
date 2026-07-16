@@ -1,4 +1,10 @@
-import { FileQuestion, LockKeyhole, ShieldAlert, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
+import { HelpContent } from "@/components/help/help-content";
 import { LegalPage } from "@/components/public/legal-page";
-export default function HelpPage() { return <LegalPage title="Help & Safety" intro="Practical guidance for creating permitted voices and handling generated audio safely."><section><h2>Common questions</h2><div className="mt-4 grid gap-3 sm:grid-cols-2">{[{ icon: FileQuestion, title: "Why was my file rejected?", copy: "Use a decodable FLAC, MP3, OGG, WAV or WebM file between 3 and 10 seconds and under 10 MB." }, { icon: SlidersHorizontal, title: "How do I improve a clone?", copy: "Use one speaker, a quiet room, natural pacing and little or no processing." }, { icon: LockKeyhole, title: "Who can access my audio?", copy: "Audio endpoints check your session and object ownership before serving a result." }, { icon: ShieldAlert, title: "How do I report misuse?", copy: "Contact the operator of this deployment. A public reporting channel must be configured before launch." }].map(({ icon: Icon, title, copy }) => <div className="panel p-5" key={title}><Icon className="h-5 w-5 text-[#a574f2]" /><h3 className="mt-3 font-semibold text-[var(--foreground)]">{title}</h3><p className="mt-2 text-sm leading-6">{copy}</p></div>)}</div></section><section><h2>Safety resources</h2><p>Review the <Link href="/acceptable-use" className="text-[#af82f2]">Acceptable Use Policy</Link> before uploading a sample. If you do not have unambiguous permission, do not upload it.</p></section></LegalPage>; }
+import { getCurrentUser } from "@/lib/auth/session";
+import { getPublicOperationsInfo } from "@/lib/config/env";
+
+export default async function HelpPage() {
+  const [user, operations] = await Promise.all([getCurrentUser(), Promise.resolve(getPublicOperationsInfo())]);
+  return <LegalPage title="Help & Safety" intro="Practical guidance for creating permitted voices and handling generated audio safely."><p className="mb-6 text-sm"><Link className="text-[#af82f2]" href={user?.id ? "/dashboard" : "/login"}>{user?.id ? "Return to your workspace" : "Sign in for workspace help"}</Link></p><HelpContent supportEmail={operations.supportEmail} abuseReportUrl={operations.abuseReportUrl} /></LegalPage>;
+}

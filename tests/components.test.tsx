@@ -11,8 +11,10 @@ import type { ProviderInfoDto, UsageDto, VoiceDto } from "@/lib/types/dto";
 
 const usage: UsageDto = {
   plan: "FREE",
+  activeProvider: "mock",
   periodKey: "2026-07",
   charactersUsed: 0,
+  demoCharactersUsed: 0,
   characterLimit: 10_000,
   voicesUsed: 0,
   voiceLimit: 2,
@@ -22,6 +24,7 @@ const mockProviderInfo: ProviderInfoDto = {
   name: "mock",
   label: "Demo Provider",
   isDemo: true,
+  showBranding: true,
   capabilities: { instantClone: true, multilingual: true },
 };
 
@@ -29,6 +32,7 @@ const cartesiaProviderInfo: ProviderInfoDto = {
   name: "cartesia",
   label: "Cartesia",
   isDemo: false,
+  showBranding: true,
   capabilities: { instantClone: true, multilingual: true },
 };
 
@@ -86,10 +90,10 @@ describe("generation panel", () => {
     render(<ToastProvider><GenerateVoicePanel voices={voices} selectedVoiceId="mock-voice" onSelectedVoice={onSelectedVoice} generation={null} onGenerated={vi.fn()} onDeleted={vi.fn()} usage={usage} providerInfo={cartesiaProviderInfo} /></ToastProvider>);
 
     const selector = screen.getByRole("combobox", { name: "Select voice" });
-    expect(screen.queryByRole("option", { name: /Studio Narration/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /Mohamed Test Voice/i })).toBeInTheDocument();
-    await userEvent.selectOptions(selector, "cartesia-voice");
-    expect(onSelectedVoice).toHaveBeenCalledWith("cartesia-voice");
+    expect(screen.queryByText(/Studio Narration/i)).not.toBeInTheDocument();
+    expect(selector).toHaveTextContent("Mohamed Test Voice");
+    expect(selector).not.toBeDisabled();
+    expect(onSelectedVoice).not.toHaveBeenCalled();
   });
 });
 

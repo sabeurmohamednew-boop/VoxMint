@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/toast";
 import { fetchJson } from "@/lib/api/client";
 import { isVoiceCompatibleWithProvider } from "@/lib/providers/compatibility";
 import type { GenerationDto, ProviderInfoDto, VoiceDto } from "@/lib/types/dto";
+import { formatDate } from "@/lib/date";
 
 export function RecentVoices({
   voices,
@@ -105,7 +106,7 @@ export function RecentVoices({
                       {voice.provider === "mock" && <span className="rounded-full border border-[#7c56d9]/30 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#b68cff]">Demo voice</span>}
                     </span>
                     <span className="mt-0.5 block text-[11px] text-[var(--foreground-secondary)]">
-                      {voice.primaryLanguage.toUpperCase()} · {new Date(voice.createdAt).toLocaleDateString()}
+                      {voice.primaryLanguage.toUpperCase()} · {formatDate(voice.createdAt)}
                     </span>
                   </span>
                 </button>
