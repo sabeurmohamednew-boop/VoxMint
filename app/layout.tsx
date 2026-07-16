@@ -17,7 +17,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable}`}
       data-scroll-behavior="smooth"
-      suppressHydrationWarning
     >
       <body>
         <ToastProvider>{children}</ToastProvider>

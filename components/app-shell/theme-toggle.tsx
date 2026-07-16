@@ -7,10 +7,18 @@ export function ThemeToggle({ initialTheme = "DARK" }: { initialTheme?: "SYSTEM"
   const [light, setLight] = useState(initialTheme === "LIGHT");
 
   useEffect(() => {
-    const shouldUseLight =
-      initialTheme === "LIGHT" ||
-      (initialTheme === "SYSTEM" && window.matchMedia("(prefers-color-scheme: light)").matches);
-    document.documentElement.classList.toggle("light", shouldUseLight);
+    const media = window.matchMedia("(prefers-color-scheme: light)");
+    const applyTheme = () => {
+      const shouldUseLight = initialTheme === "LIGHT" || (initialTheme === "SYSTEM" && media.matches);
+      setLight(shouldUseLight);
+      document.documentElement.classList.toggle("light", shouldUseLight);
+    };
+    const frame = window.requestAnimationFrame(applyTheme);
+    if (initialTheme === "SYSTEM") media.addEventListener("change", applyTheme);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      media.removeEventListener("change", applyTheme);
+    };
   }, [initialTheme]);
 
   function toggle() {

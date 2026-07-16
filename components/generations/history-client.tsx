@@ -10,13 +10,14 @@ import { fetchJson } from "@/lib/api/client";
 import { downloadAudio } from "@/lib/audio/client";
 import { formatDuration, safeBaseName } from "@/lib/audio/utils";
 import { formatDate } from "@/lib/date";
+import type { HistoryProviderFilter } from "@/lib/history/provider-filter";
 import type { GenerationDto, VoiceDto } from "@/lib/types/dto";
 
-export function HistoryClient({ initialGenerations, voices }: { initialGenerations: GenerationDto[]; voices: VoiceDto[] }) {
+export function HistoryClient({ initialGenerations, voices, initialProvider }: { initialGenerations: GenerationDto[]; voices: VoiceDto[]; initialProvider: HistoryProviderFilter }) {
   const [generations, setGenerations] = useState(initialGenerations);
   const [search, setSearch] = useState("");
   const [voice, setVoice] = useState("all");
-  const [provider, setProvider] = useState("all");
+  const [provider, setProvider] = useState<HistoryProviderFilter>(initialProvider);
   const [status, setStatus] = useState("all");
   const [sort, setSort] = useState("newest");
   const [selected, setSelected] = useState<GenerationDto | null>(null);
@@ -24,6 +25,13 @@ export function HistoryClient({ initialGenerations, voices }: { initialGeneratio
   const [rename, setRename] = useState<GenerationDto | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const { showToast } = useToast();
+
+  function changeProvider(value: HistoryProviderFilter) {
+    setProvider(value);
+    const url = new URL(window.location.href);
+    url.searchParams.set("provider", value);
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  }
 
   const filtered = useMemo(() => generations.filter((item) => {
     const matchesText = item.text.toLowerCase().includes(search.toLowerCase()) || (item.title ?? "").toLowerCase().includes(search.toLowerCase());
@@ -67,7 +75,7 @@ export function HistoryClient({ initialGenerations, voices }: { initialGeneratio
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_160px_140px_150px_130px]">
       <label className="relative sm:col-span-2 xl:col-span-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted)]" /><span className="sr-only">Search scripts</span><input className="field pl-10 pr-3" placeholder="Search scripts and titles" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
       <select className="field px-3" aria-label="Filter by voice" value={voice} onChange={(event) => setVoice(event.target.value)}><option value="all">All voices</option>{voices.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
-      <select className="field px-3" aria-label="Filter by provider" value={provider} onChange={(event) => setProvider(event.target.value)}><option value="all">All providers</option><option value="cartesia">Cartesia</option><option value="mock">Demo</option></select>
+      <select className="field px-3" aria-label="Filter by provider" value={provider} onChange={(event) => changeProvider(event.target.value as HistoryProviderFilter)}><option value="all">All providers</option><option value="cartesia">Cartesia</option><option value="mock">Demo</option></select>
       <select className="field px-3" aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All statuses</option><option value="READY">Ready</option><option value="MISSING">Audio missing</option><option value="FAILED">Failed</option><option value="PROCESSING">Processing</option></select>
       <select className="field px-3" aria-label="Sort history" value={sort} onChange={(event) => setSort(event.target.value)}><option value="newest">Newest</option><option value="oldest">Oldest</option></select>
     </div>

@@ -8,6 +8,7 @@ export type VoiceDto = {
   createdAt: string;
   lastUsedAt: string | null;
   sourceDurationMs: number;
+  generationCount: number;
   selected?: boolean;
 };
 

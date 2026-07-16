@@ -47,7 +47,7 @@ export function AppSidebar() {
       <div className="mt-auto px-5 pb-5">
         <div className="panel-quiet p-4">
           <div className="flex items-center gap-2 text-[#a36afb]"><Crown className="h-5 w-5 text-[#f4ac52]" /><span className="font-semibold">Plans &amp; usage</span></div>
-          <p className="mt-3 text-[12.5px] leading-5 text-[var(--foreground-secondary)]">Review limits and deployment billing status.</p>
+          <p className="mt-3 text-[12.5px] leading-5 text-[var(--foreground-secondary)]">Review provider limits and deployment billing status.</p>
           <Link href="/billing" className="button-secondary mt-4 w-full min-h-[40px]">Billing details</Link>
         </div>
       </div>

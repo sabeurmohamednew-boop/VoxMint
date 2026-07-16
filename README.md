@@ -70,7 +70,7 @@ Important locations:
 
    `DEV_BYPASS_AUTH=true` is rejected in production. The mock provider is also refused in production unless the explicit dangerous override is set.
 
-3. Generate the Prisma client, apply the migration, and seed demo content:
+3. Generate the Prisma client, apply the migration, and seed development content:
 
    ```bash
    npm run db:generate
@@ -87,6 +87,8 @@ Important locations:
 5. Open `http://localhost:3000/login` and choose **Enter demo workspace**.
 
 When `VOICE_PROVIDER=mock`, the seed creates a synthetic demo user and fictional mock voices. In Cartesia mode it skips mock voice records, so fake voices are not mixed into a real provider workspace.
+
+The current `FREE` and `PRO` database values are internal allowance tiers, not paid VoxMint products. The Billing page deliberately presents development access, the active provider allowance, and payment availability as separate concepts. Checkout remains hidden until a real `BillingAdapter`, webhook handling, and persisted application-plan mapping exist.
 
 ## Environment variables
 
@@ -218,6 +220,8 @@ Playwright needs an initialized PostgreSQL database. Set `TEST_DATABASE_URL` to 
 ## Deployment
 
 For Vercel, provision PostgreSQL (for example Neon), R2, Upstash Redis, Google OAuth, and Cartesia. Add all production variables, run `npm run db:deploy`, then deploy. Production validation refuses demo auth, local storage, in-memory rate limiting, and the mock provider by default.
+
+See [`docs/deployment-readiness.md`](docs/deployment-readiness.md) for the runtime topology, environment mapping, secret boundaries, migration order, rollback considerations, and currently inactive services.
 
 ## Known limitations
 

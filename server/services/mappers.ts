@@ -1,7 +1,11 @@
 import type { Generation, Voice } from "@/app/generated/prisma/client";
 import type { GenerationDto, VoiceDto } from "@/lib/types/dto";
 
-export function voiceDto(voice: Voice): VoiceDto {
+type VoiceWithGenerationCount = Voice & {
+  _count?: { generations: number };
+};
+
+export function voiceDto(voice: VoiceWithGenerationCount): VoiceDto {
   return {
     id: voice.id,
     provider: voice.provider,
@@ -12,6 +16,7 @@ export function voiceDto(voice: Voice): VoiceDto {
     createdAt: voice.createdAt.toISOString(),
     lastUsedAt: voice.lastUsedAt?.toISOString() ?? null,
     sourceDurationMs: voice.sourceDurationMs,
+    generationCount: voice._count?.generations ?? 0,
   };
 }
 

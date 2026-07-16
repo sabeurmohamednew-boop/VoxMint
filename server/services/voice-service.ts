@@ -21,6 +21,11 @@ export async function listVoices(userId: string, limit = 50): Promise<VoiceDto[]
     where: { userId, deletedAt: null, status: { not: "DELETED" } },
     orderBy: [{ lastUsedAt: "desc" }, { createdAt: "desc" }],
     take: Math.min(limit, 100),
+    include: {
+      _count: {
+        select: { generations: { where: { deletedAt: null } } },
+      },
+    },
   });
   return voices.map(voiceDto);
 }
@@ -133,6 +138,11 @@ export async function updateVoiceForUser(userId: string, voiceId: string, unknow
     await prisma.voice.update({
       where: { id: voice.id },
       data: { name: input.name, description: input.description },
+      include: {
+        _count: {
+          select: { generations: { where: { deletedAt: null } } },
+        },
+      },
     }),
   );
 }

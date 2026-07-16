@@ -31,7 +31,13 @@ function humanSize(bytes: number) {
   return bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(0)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export function CloneVoicePanel({ onCreated }: { onCreated: (voice: VoiceDto) => void }) {
+export function CloneVoicePanel({
+  onCreated,
+  onboardingStep,
+}: {
+  onCreated: (voice: VoiceDto) => void;
+  onboardingStep?: number;
+}) {
   const [state, dispatch] = useReducer(reducer, { phase: "idle", file: null, error: null });
   const [name, setName] = useState("");
   const [language, setLanguage] = useState("en");
@@ -95,7 +101,7 @@ export function CloneVoicePanel({ onCreated }: { onCreated: (voice: VoiceDto) =>
   return (
     <section id="clone" className="clone-panel panel p-5 sm:p-[22px]" aria-labelledby="clone-title">
       <div className="flex items-start gap-3">
-        <span className="step-badge">1</span>
+        {onboardingStep && <span className="step-badge">{onboardingStep}</span>}
         <div><h2 id="clone-title" className="text-[19px] font-semibold tracking-[-0.015em]">Clone a Voice</h2><p className="mt-1 text-[13px] leading-5 text-[var(--foreground-secondary)]">Upload a clean sample of a voice you own or have permission to use.</p></div>
       </div>
       <form className="mt-5 space-y-4" onSubmit={submit}>

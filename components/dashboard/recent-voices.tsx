@@ -1,14 +1,14 @@
 "use client";
 
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { MoreVertical, Mic2, Play, Settings2, Trash2 } from "lucide-react";
+import { MoreVertical, Mic2, Settings2, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
 import { fetchJson } from "@/lib/api/client";
 import { isVoiceCompatibleWithProvider } from "@/lib/providers/compatibility";
-import type { GenerationDto, ProviderInfoDto, VoiceDto } from "@/lib/types/dto";
+import type { ProviderInfoDto, VoiceDto } from "@/lib/types/dto";
 import { formatDate } from "@/lib/date";
 
 export function RecentVoices({
@@ -16,14 +16,12 @@ export function RecentVoices({
   selectedId,
   onSelect,
   onDelete,
-  onGenerated,
   providerInfo,
 }: {
   voices: VoiceDto[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
-  onGenerated: (generation: GenerationDto) => void;
   providerInfo: ProviderInfoDto;
 }) {
   const [deleteVoice, setDeleteVoice] = useState<VoiceDto | null>(null);
@@ -37,22 +35,6 @@ export function RecentVoices({
       ),
     [providerInfo.name, voices],
   );
-
-  async function preview(voice: VoiceDto) {
-    if (!isVoiceCompatibleWithProvider(voice.provider, providerInfo.name)) return;
-    try {
-      const result = await fetchJson<{ generation: GenerationDto }>(
-        `/api/voices/${voice.id}/preview`,
-        { method: "POST" },
-      );
-      onSelect(voice.id);
-      onGenerated(result.generation);
-      showToast("Test voiceover generated");
-      document.querySelector("#generate")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "Test generation failed.", "error");
-    }
-  }
 
   async function confirmDelete() {
     if (!deleteVoice) return;
@@ -83,17 +65,18 @@ export function RecentVoices({
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {visibleVoices.slice(0, 3).map((voice) => {
             const compatible = isVoiceCompatibleWithProvider(voice.provider, providerInfo.name);
+            const usable = compatible && voice.status === "READY";
             return (
               <div
                 key={voice.id}
-                className={`voice-card ${compatible ? "" : "opacity-70"}`}
-                data-selected={compatible && voice.id === selectedId}
+                className={`voice-card ${usable ? "" : "opacity-70"}`}
+                data-selected={usable && voice.id === selectedId}
               >
                 <button
                   type="button"
                   className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                  disabled={!compatible}
-                  title={compatible ? `Use ${voice.name}` : `${voice.name} is unavailable with ${providerInfo.label}`}
+                  disabled={!usable}
+                  title={usable ? `Use ${voice.name}` : `${voice.name} is unavailable for generation`}
                   onClick={() => {
                     onSelect(voice.id);
                     document.querySelector("#generate")?.scrollIntoView({ behavior: "smooth" });
@@ -113,12 +96,11 @@ export function RecentVoices({
 
                 <DropdownMenu.Root>
                   <DropdownMenu.Trigger asChild>
-                    <button type="button" className="button-ghost h-9 min-h-9 w-9 p-0" aria-label={`Actions for ${voice.name}`}><MoreVertical className="h-4 w-4" /></button>
+                    <button type="button" className="button-ghost h-11 min-h-11 w-11 p-0" aria-label={`Actions for ${voice.name}`}><MoreVertical className="h-4 w-4" /></button>
                   </DropdownMenu.Trigger>
                   <DropdownMenu.Portal>
                     <DropdownMenu.Content className="menu-content" sideOffset={6} align="end">
-                      <DropdownMenu.Item className="menu-item" disabled={!compatible} onSelect={() => onSelect(voice.id)}><Mic2 className="h-4 w-4" />Use voice</DropdownMenu.Item>
-                      <DropdownMenu.Item className="menu-item" disabled={!compatible} onSelect={() => void preview(voice)}><Play className="h-4 w-4" />Generate test</DropdownMenu.Item>
+                      <DropdownMenu.Item className="menu-item" disabled={!usable} asChild={usable}>{usable ? <Link href={`/dashboard?voice=${encodeURIComponent(voice.id)}#generate`}><Mic2 className="h-4 w-4" />Use voice</Link> : <span><Mic2 className="h-4 w-4" />Use voice</span>}</DropdownMenu.Item>
                       <DropdownMenu.Item className="menu-item" asChild><Link href="/voices"><Settings2 className="h-4 w-4" />Manage</Link></DropdownMenu.Item>
                       <DropdownMenu.Item className="menu-item danger" onSelect={() => setDeleteVoice(voice)}><Trash2 className="h-4 w-4" />Delete</DropdownMenu.Item>
                     </DropdownMenu.Content>
