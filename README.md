@@ -105,6 +105,7 @@ Authentication:
 - `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`: required for Google OAuth in production
 - `AUTH_EMAIL_SERVER`, `AUTH_EMAIL_FROM`: optional email magic-link provider
 - `DEV_BYPASS_AUTH`: development demo login; cannot run in production
+- `E2E_TEST_AUTH`: isolated two-user Playwright login; valid only with `NODE_ENV=test`
 
 Voice provider:
 
@@ -123,6 +124,14 @@ Rate limiting:
 
 - `RATE_LIMIT_PROVIDER=memory|upstash`
 - `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
+
+Cost and launch controls:
+
+- `VOICE_OPERATIONS_ENABLED`: emergency switch for new clone/generation operations; existing playback remains available
+- `VOICE_CREATIONS_PER_HOUR`, `GENERATIONS_PER_MINUTE`, `DOWNLOADS_PER_MINUTE`
+- `DAILY_CHARACTER_LIMIT`, `MONTHLY_CHARACTER_LIMIT`, `GLOBAL_DAILY_CHARACTER_LIMIT`
+- `MAX_CONCURRENT_PROVIDER_REQUESTS`
+- `PUBLIC_LAUNCH`: requires real operator, support, abuse, privacy, effective-date, and jurisdiction settings in production
 
 Limits:
 
@@ -199,11 +208,15 @@ npm run db:deploy    # apply committed migrations in production
 npm run db:seed      # seed synthetic mock data
 npm run db:studio    # Prisma Studio
 npm run db:cleanup-demo # dry-run report for safely removable, unreferenced demo voices
+npm run db:reconcile-voices # dry-run Cartesia existence report; -- --apply marks only missing records
+npm run preflight:production # redacted production configuration gate
 ```
 
 `npm run db:cleanup-demo -- --apply` only soft-deletes unreferenced mock voices, only outside production, and only while Cartesia is active. It never deletes generations, referenced voices, real Cartesia voices, or user accounts.
 
-Playwright needs an initialized PostgreSQL database. Set `TEST_DATABASE_URL` to an isolated migrated test database before running `npm run test:e2e`; tests never call paid Cartesia APIs.
+Playwright requires an isolated PostgreSQL database or schema whose URL visibly contains `test`, `e2e`, or `playwright`. It refuses a missing `TEST_DATABASE_URL`, equality with `DATABASE_URL`/`PRODUCTION_DATABASE_URL`, and obvious production targets. The harness applies committed migrations, clears only that isolated target, uses `.data/e2e-storage`, mock audio, and two identities. It never calls paid Cartesia APIs.
+
+`npm run test:cartesia:live` is disabled unless `LIVE_CARTESIA_E2E=true` and separate `CARTESIA_E2E_API_KEY` and `CARTESIA_E2E_VOICE_ID` values are supplied. It makes one tiny generation and is never part of CI.
 
 ## Security and consent
 
@@ -212,6 +225,7 @@ Playwright needs an initialized PostgreSQL database. Set `TEST_DATABASE_URL` to 
 - Uploads are capped, magic-byte detected, decoded, duration checked, and never executed.
 - Source samples are not retained after provider cloning.
 - Usage is reserved and committed in serializable database transactions, then released on provider or storage failure.
+- Displayed Cartesia usage is the VoxMint deployment ledger and configured ceiling, not the authoritative Cartesia subscription balance.
 - Generated audio is stored outside PostgreSQL and streamed through an authenticated, private, no-store endpoint with byte-range support.
 - Scripts, audio, credentials, raw provider responses, OAuth tokens, and signed URLs are excluded from structured logs.
 - Local storage, in-memory rate limiting, demo auth, and the mock provider are development tools—not multi-instance production controls.
@@ -222,6 +236,7 @@ Playwright needs an initialized PostgreSQL database. Set `TEST_DATABASE_URL` to 
 For Vercel, provision PostgreSQL (for example Neon), R2, Upstash Redis, Google OAuth, and Cartesia. Add all production variables, run `npm run db:deploy`, then deploy. Production validation refuses demo auth, local storage, in-memory rate limiting, and the mock provider by default.
 
 See [`docs/deployment-readiness.md`](docs/deployment-readiness.md) for the runtime topology, environment mapping, secret boundaries, migration order, rollback considerations, and currently inactive services.
+See [`docs/operations-runbook.md`](docs/operations-runbook.md) for release owner actions, alerts, recovery, isolated E2E, and rollback.
 
 ## Known limitations
 
