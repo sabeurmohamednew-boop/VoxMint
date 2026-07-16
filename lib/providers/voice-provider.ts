@@ -47,4 +47,5 @@ export interface VoiceProvider {
   synthesize(input: SynthesizeInput): Promise<SynthesizeResult>;
   deleteVoice(providerVoiceId: string): Promise<void>;
   updateVoice?(providerVoiceId: string, input: { name?: string; description?: string }): Promise<void>;
+  getVoiceState?(providerVoiceId: string): Promise<"ready" | "missing">;
 }

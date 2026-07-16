@@ -7,6 +7,7 @@ const providerInfo: ProviderInfoDto = {
   label: "Cartesia",
   isDemo: false,
   showBranding: true,
+  operationsEnabled: true,
   capabilities: { instantClone: true, multilingual: true },
 };
 

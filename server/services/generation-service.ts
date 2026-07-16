@@ -8,7 +8,7 @@ import { extensionForMime } from "@/lib/audio/utils";
 import { validateGeneratedAudio } from "@/lib/audio/validation";
 import { getEnv } from "@/lib/config/env";
 import { prisma } from "@/lib/db/prisma";
-import { ProviderError } from "@/lib/providers/errors";
+import { ProviderAuthenticationError, ProviderError, ProviderRateLimitError, ProviderTimeoutError } from "@/lib/providers/errors";
 import { isVoiceCompatibleWithProvider } from "@/lib/providers/compatibility";
 import { getVoiceProvider } from "@/lib/providers";
 import { assertVoiceOperationsEnabled, consumeOperationLimits, getRateLimiter, configuredRateLimits, withProviderConcurrency } from "@/lib/rate-limit/rate-limiter";
@@ -22,9 +22,9 @@ import { requireOwnedAudioObject, requireOwnedGeneration, requireOwnedVoice } fr
 import { logger, safeUserId } from "@/lib/logging/logger";
 import { compensateStoredObject } from "@/server/services/storage-compensation";
 
-export async function listGenerations(userId: string, limit = 50): Promise<GenerationDto[]> {
+export async function listGenerations(userId: string, limit = 50, provider?: "mock" | "cartesia"): Promise<GenerationDto[]> {
   const generations = await prisma.generation.findMany({
-    where: { userId, deletedAt: null, status: { not: "DELETED" } },
+    where: { userId, deletedAt: null, status: { not: "DELETED" }, provider },
     include: { voice: { select: { name: true } } },
     orderBy: { createdAt: "desc" },
     take: Math.min(limit, 100),
@@ -46,7 +46,36 @@ async function measuredDuration(bytes: Uint8Array, mimeType: string): Promise<nu
   }
 }
 
-export async function generateForUser(userId: string, unknownInput: unknown, requestIp = "unknown", requestId?: string): Promise<GenerationDto> {
+export type GenerationTestFailureMode =
+  | "database-before-provider"
+  | "provider-authentication"
+  | "provider-rate-limit"
+  | "provider-timeout"
+  | "provider-empty-audio"
+  | "provider-malformed-audio"
+  | "provider-delay"
+  | "storage"
+  | "db-finalize";
+
+const generationTestFailureModes = new Set<GenerationTestFailureMode>([
+  "database-before-provider",
+  "provider-authentication",
+  "provider-rate-limit",
+  "provider-timeout",
+  "provider-empty-audio",
+  "provider-malformed-audio",
+  "provider-delay",
+  "storage",
+  "db-finalize",
+]);
+
+export function parseGenerationTestFailureMode(value: string | null): GenerationTestFailureMode | null {
+  return value && generationTestFailureModes.has(value as GenerationTestFailureMode)
+    ? value as GenerationTestFailureMode
+    : null;
+}
+
+export async function generateForUser(userId: string, unknownInput: unknown, requestIp = "unknown", requestId?: string, testFailureMode: GenerationTestFailureMode | null = null): Promise<GenerationDto> {
   const startedAt = Date.now();
   const env = getEnv();
   const input = generationSchema(env.GENERATION_MAX_CHARACTERS).parse(unknownInput);
@@ -73,6 +102,9 @@ export async function generateForUser(userId: string, unknownInput: unknown, req
   const characterCount = Array.from(input.text).length;
   const textHash = createHash("sha256").update(input.text).digest("hex");
   const periodKey = currentPeriodKey();
+  if (testFailureMode === "database-before-provider") {
+    throw new AppError("TEST_DATABASE_UNAVAILABLE", "The generation could not be started.", 500);
+  }
   const dayStart = new Date();
   dayStart.setUTCHours(0, 0, 0, 0);
   let pending: { id: string };
@@ -154,13 +186,24 @@ export async function generateForUser(userId: string, unknownInput: unknown, req
 
   let storedKey: string | undefined;
   try {
-    const generated = await withProviderConcurrency(userId, () => provider.synthesize({
+    if (testFailureMode === "provider-authentication") throw new ProviderAuthenticationError("Injected test authentication failure");
+    if (testFailureMode === "provider-rate-limit") throw new ProviderRateLimitError("Injected test rate limit");
+    if (testFailureMode === "provider-timeout") throw new ProviderTimeoutError("Injected test timeout");
+    if (testFailureMode === "provider-delay") await new Promise((resolve) => setTimeout(resolve, 350));
+    let generated = await withProviderConcurrency(userId, () => provider.synthesize({
       providerVoiceId: voice.providerVoiceId,
       text: input.text,
       language: input.language,
       model: env.CARTESIA_TTS_MODEL,
     }));
+    if (testFailureMode === "provider-empty-audio") {
+      generated = { ...generated, bytes: new Uint8Array() };
+    }
+    if (testFailureMode === "provider-malformed-audio") {
+      generated = { ...generated, bytes: new TextEncoder().encode("not audio") };
+    }
     validateGeneratedAudio(generated.bytes, generated.mimeType);
+    if (testFailureMode === "storage") throw new Error("Injected test storage failure");
     const extension = extensionForMime(generated.mimeType) ?? "wav";
     storedKey = generationStorageKey(userId, pending.id, extension);
     const stored = await getObjectStorage().put({
@@ -170,6 +213,7 @@ export async function generateForUser(userId: string, unknownInput: unknown, req
       metadata: { generationId: pending.id },
     });
     const durationMs = generated.durationMs ?? (await measuredDuration(generated.bytes, generated.mimeType));
+    if (testFailureMode === "db-finalize") throw new Error("Injected test finalization failure");
 
     const ready = await prisma.$transaction(async (transaction) => {
       const generation = await transaction.generation.update({
@@ -203,13 +247,22 @@ export async function generateForUser(userId: string, unknownInput: unknown, req
     if (storedKey) {
       await compensateStoredObject(getObjectStorage(), storedKey, { requestId, user: safeUserId(userId), provider: provider.name });
     }
-    const safeMessage = error instanceof ProviderError ? error.safeMessage : "Audio could not be generated.";
+    const safeMessage = error instanceof ProviderError
+      ? error.safeMessage
+      : error instanceof AppError
+        ? error.message
+        : "Audio could not be generated.";
+    const errorCategory = error instanceof ProviderError
+      ? error.category
+      : error instanceof AppError
+        ? error.code
+        : "GENERATION_FAILED";
     await prisma.$transaction([
       prisma.generation.update({
         where: { id: pending.id },
         data: {
           status: "FAILED",
-          errorCode: error instanceof ProviderError ? error.category : "GENERATION_FAILED",
+          errorCode: errorCategory,
           errorMessageSafe: safeMessage,
           completedAt: new Date(),
         },
@@ -219,8 +272,9 @@ export async function generateForUser(userId: string, unknownInput: unknown, req
         data: { status: "RELEASED" },
       }),
     ]);
-    logger.error("generation.create", { requestId, user: safeUserId(userId), provider: provider.name, status: "failed", latencyMs: Date.now() - startedAt, characterCount, category: error instanceof ProviderError ? error.category : "GENERATION_FAILED" });
-    throw new AppError("GENERATION_FAILED", safeMessage, error instanceof ProviderError ? 502 : 500);
+    logger.error("generation.create", { requestId, user: safeUserId(userId), provider: provider.name, status: "failed", latencyMs: Date.now() - startedAt, characterCount, category: errorCategory });
+    const status = error instanceof ProviderError ? 502 : error instanceof AppError ? error.status : 500;
+    throw new AppError("GENERATION_FAILED", safeMessage, status);
   }
 }
 

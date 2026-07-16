@@ -90,6 +90,7 @@ export class CartesiaVoiceProvider implements VoiceProvider {
     try {
       await this.client.voices.delete(providerVoiceId);
     } catch (error) {
+      if (error instanceof Cartesia.APIError && error.status === 404) return;
       return mapCartesiaError(error);
     }
   }
@@ -98,6 +99,16 @@ export class CartesiaVoiceProvider implements VoiceProvider {
     try {
       await this.client.voices.update(providerVoiceId, input);
     } catch (error) {
+      return mapCartesiaError(error);
+    }
+  }
+
+  async getVoiceState(providerVoiceId: string) {
+    try {
+      await this.client.voices.get(providerVoiceId);
+      return "ready" as const;
+    } catch (error) {
+      if (error instanceof Cartesia.APIError && error.status === 404) return "missing" as const;
       return mapCartesiaError(error);
     }
   }

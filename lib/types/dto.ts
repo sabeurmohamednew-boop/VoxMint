@@ -19,6 +19,7 @@ export type ProviderInfoDto = {
   label: "Demo Provider" | "Cartesia";
   isDemo: boolean;
   showBranding: boolean;
+  operationsEnabled: boolean;
   capabilities: {
     instantClone: boolean;
     multilingual: boolean;

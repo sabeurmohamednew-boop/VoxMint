@@ -74,4 +74,8 @@ export class MockVoiceProvider implements VoiceProvider {
   async updateVoice() {
     await delay(80);
   }
+
+  async getVoiceState() {
+    return "ready" as const;
+  }
 }

@@ -1,9 +1,9 @@
 "use client";
 
-import { BarChart3, Clock3, Crown, HelpCircle, Home, Menu, Mic2, Settings, X } from "lucide-react";
+import { BarChart3, Clock3, Gauge, HelpCircle, Home, Menu, Mic2, Settings, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { VoxMintLogo } from "@/components/branding/voxmint-logo";
 
 const navigation = [
@@ -46,9 +46,9 @@ export function AppSidebar() {
       <NavItems />
       <div className="mt-auto px-5 pb-5">
         <div className="panel-quiet p-4">
-          <div className="flex items-center gap-2 text-[#a36afb]"><Crown className="h-5 w-5 text-[#f4ac52]" /><span className="font-semibold">Plans &amp; usage</span></div>
-          <p className="mt-3 text-[12.5px] leading-5 text-[var(--foreground-secondary)]">Review provider limits and deployment billing status.</p>
-          <Link href="/billing" className="button-secondary mt-4 w-full min-h-[40px]">Billing details</Link>
+          <div className="flex items-center gap-2 text-[#a36afb]"><Gauge className="h-5 w-5" /><span className="font-semibold">Usage &amp; deployment</span></div>
+          <p className="mt-3 text-[12.5px] leading-5 text-[var(--foreground-secondary)]">Review VoxMint-tracked usage and service availability.</p>
+          <Link href="/billing" className="button-secondary mt-4 w-full min-h-[40px]">Service status</Link>
         </div>
       </div>
       <div className="border-t border-[var(--border-subtle)] px-5 py-4">
@@ -61,23 +61,36 @@ export function AppSidebar() {
 
 export function MobileNavigation({ title, right }: { title: string; right: React.ReactNode }) {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
+    if (open) window.requestAnimationFrame(() => dialogRef.current?.querySelector<HTMLButtonElement>("button")?.focus());
     return () => { document.body.style.overflow = ""; };
   }, [open]);
+  function close() { setOpen(false); window.requestAnimationFrame(() => triggerRef.current?.focus()); }
+  function trapKeyboard(event: React.KeyboardEvent) {
+    if (event.key === "Escape") { event.preventDefault(); close(); return; }
+    if (event.key !== "Tab" || !dialogRef.current) return;
+    const controls = Array.from(dialogRef.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+    const first = controls[0]; const last = controls.at(-1);
+    if (!first || !last) return;
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  }
   return (
     <>
       <header className="mobile-bar">
-        <button type="button" className="icon-button border-0 bg-transparent" onClick={() => setOpen(true)} aria-label="Open navigation"><Menu className="h-5 w-5" /></button>
+        <button ref={triggerRef} type="button" className="icon-button border-0 bg-transparent" onClick={() => setOpen(true)} aria-label="Open navigation"><Menu className="h-5 w-5" /></button>
         <div className="flex items-center gap-2"><VoxMintLogo compact /><span className="text-sm font-semibold">{title}</span></div>
         {right}
       </header>
       {open && (
-        <div className="fixed inset-0 z-[80] bg-black/65" role="presentation" onMouseDown={() => setOpen(false)}>
-          <aside className="flex h-full w-[min(86vw,320px)] flex-col border-r border-[var(--border)] bg-[var(--sidebar)]" role="dialog" aria-modal="true" aria-label="Navigation" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="sidebar-brand justify-between"><VoxMintLogo /><button type="button" className="icon-button border-0 bg-transparent" onClick={() => setOpen(false)} aria-label="Close navigation"><X className="h-5 w-5" /></button></div>
-            <NavItems onNavigate={() => setOpen(false)} />
-            <Link href="/help" onClick={() => setOpen(false)} className="mt-auto flex min-h-[56px] items-center gap-3 border-t border-[var(--border-subtle)] px-7 text-sm text-[var(--foreground-secondary)]"><HelpCircle className="h-5 w-5" />Help &amp; Safety</Link>
+        <div className="fixed inset-0 z-[80] bg-black/65" role="presentation" onMouseDown={close}>
+          <aside ref={dialogRef} className="flex h-full w-[min(86vw,320px)] flex-col border-r border-[var(--border)] bg-[var(--sidebar)]" role="dialog" aria-modal="true" aria-label="Navigation" onKeyDown={trapKeyboard} onMouseDown={(event) => event.stopPropagation()}>
+            <div className="sidebar-brand justify-between"><VoxMintLogo /><button type="button" className="icon-button border-0 bg-transparent" onClick={close} aria-label="Close navigation"><X className="h-5 w-5" /></button></div>
+            <NavItems onNavigate={close} />
+            <Link href="/help" onClick={close} className="mt-auto flex min-h-[56px] items-center gap-3 border-t border-[var(--border-subtle)] px-7 text-sm text-[var(--foreground-secondary)]"><HelpCircle className="h-5 w-5" />Help &amp; Safety</Link>
           </aside>
         </div>
       )}

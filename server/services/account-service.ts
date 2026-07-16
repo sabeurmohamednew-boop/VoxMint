@@ -6,6 +6,7 @@ import { updateAccountSchema } from "@/lib/validation/schemas";
 import { getObjectStorage } from "@/lib/storage";
 import { getVoiceProvider } from "@/lib/providers";
 import { getEnv } from "@/lib/config/env";
+import { logger, safeUserId } from "@/lib/logging/logger";
 
 export async function getAccount(userId: string) {
   const account = await prisma.user.findFirst({
@@ -53,25 +54,23 @@ export async function deleteAccount(userId: string): Promise<void> {
     prisma.generation.findMany({ where: { userId, deletedAt: null } }),
   ]);
   const provider = getVoiceProvider();
+  if (!provider.capabilities.deletion || voices.some((voice) => voice.provider !== provider.name)) {
+    throw new AppError("ACCOUNT_DELETE_PROVIDER_MISMATCH", "Account deletion requires the provider used by every active voice.", 409);
+  }
   await prisma.$transaction([
     prisma.voice.updateMany({ where: { userId, deletedAt: null }, data: { status: "DELETING" } }),
     prisma.generation.updateMany({ where: { userId, deletedAt: null }, data: { status: "DELETING" } }),
   ]);
   const failures: unknown[] = [];
   for (const voice of voices) {
-    if (voice.provider === provider.name && provider.capabilities.deletion) {
-      await provider.deleteVoice(voice.providerVoiceId).catch((error) => failures.push(error));
-    }
+    await provider.deleteVoice(voice.providerVoiceId).catch((error) => failures.push(error));
   }
   for (const generation of generations) {
     if (generation.storageKey) await getObjectStorage().delete(generation.storageKey).catch((error) => failures.push(error));
   }
   if (failures.length) {
-    await prisma.$transaction([
-      ...voices.map((voice) => prisma.voice.update({ where: { id: voice.id }, data: { status: voice.status } })),
-      ...generations.map((generation) => prisma.generation.update({ where: { id: generation.id }, data: { status: generation.status } })),
-    ]);
-    throw new AppError("ACCOUNT_DELETE_INCOMPLETE", "Account deletion could not finish. The account remains active; retry or contact the deployment operator.", 502);
+    logger.error("account.delete", { user: safeUserId(userId), status: "cleanup_pending", category: "ACCOUNT_DELETE_INCOMPLETE", failureCount: failures.length });
+    throw new AppError("ACCOUNT_DELETE_INCOMPLETE", "Account deletion is pending. The account remains active; retry after provider or storage recovery.", 502);
   }
   const now = new Date();
   await prisma.$transaction([
@@ -81,4 +80,5 @@ export async function deleteAccount(userId: string): Promise<void> {
     prisma.account.deleteMany({ where: { userId } }),
     prisma.user.update({ where: { id: userId }, data: { deletedAt: now, name: "Deleted user", image: null } }),
   ]);
+  logger.info("account.delete", { user: safeUserId(userId), status: "deleted", provider: provider.name });
 }

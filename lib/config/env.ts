@@ -55,7 +55,6 @@ export const envSchema = z
     UPSTASH_REDIS_REST_TOKEN: optionalEnvString(),
     DEV_BYPASS_AUTH: booleanString,
     E2E_TEST_AUTH: booleanString,
-    ALLOW_MOCK_PROVIDER_IN_PRODUCTION: booleanString,
     NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
     VOICE_SAMPLE_MIN_SECONDS: positiveInteger(3),
     VOICE_SAMPLE_MAX_SECONDS: positiveInteger(10),
@@ -172,7 +171,7 @@ export const envSchema = z
         message: "Google OAuth is required in production.",
       });
     }
-    if (env.VOICE_PROVIDER === "mock" && !env.ALLOW_MOCK_PROVIDER_IN_PRODUCTION) {
+    if (env.VOICE_PROVIDER === "mock") {
       context.addIssue({
         code: "custom",
         path: ["VOICE_PROVIDER"],

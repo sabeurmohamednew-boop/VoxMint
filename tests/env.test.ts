@@ -12,7 +12,6 @@ const localEnv = {
   LOCAL_STORAGE_PATH: ".data/storage",
   RATE_LIMIT_PROVIDER: "memory",
   DEV_BYPASS_AUTH: "true",
-  ALLOW_MOCK_PROVIDER_IN_PRODUCTION: "false",
   NEXT_PUBLIC_APP_URL: "http://localhost:3000",
 } as const;
 
@@ -115,6 +114,10 @@ describe("provider-specific configuration", () => {
     expect(issuePaths({ ...localEnv, VOICE_PROVIDER: "cartesia" })).toContain("CARTESIA_API_KEY");
     expect(() => parseEnv({ ...localEnv, VOICE_PROVIDER: "cartesia", CARTESIA_API_KEY: "key" })).not.toThrow();
   });
+
+  it("refuses the mock provider in production", () => {
+    expect(issuePaths({ ...productionEnv, VOICE_PROVIDER: "mock", CARTESIA_API_KEY: undefined })).toContain("VOICE_PROVIDER");
+  });
 });
 
 describe("authentication configuration", () => {
@@ -132,5 +135,20 @@ describe("authentication configuration", () => {
     expect(() => parseEnv({ ...localEnv, AUTH_EMAIL_SERVER: "", AUTH_EMAIL_FROM: "" })).not.toThrow();
     expect(issuePaths({ ...localEnv, AUTH_EMAIL_SERVER: "smtp://localhost:1025" })).toContain("AUTH_EMAIL_FROM");
     expect(issuePaths({ ...localEnv, AUTH_EMAIL_FROM: "hello@voxmint.test" })).toContain("AUTH_EMAIL_SERVER");
+  });
+
+  it("allows test auth only in the test environment", () => {
+    expect(issuePaths({ ...localEnv, E2E_TEST_AUTH: "true" })).toContain("E2E_TEST_AUTH");
+    expect(() => parseEnv({ ...localEnv, NODE_ENV: "test", DEV_BYPASS_AUTH: "false", E2E_TEST_AUTH: "true" })).not.toThrow();
+    expect(issuePaths({ ...productionEnv, E2E_TEST_AUTH: "true" })).toContain("E2E_TEST_AUTH");
+  });
+
+  it("requires real launch contacts when public launch is declared", () => {
+    expect(issuePaths({ ...productionEnv, PUBLIC_LAUNCH: "true" })).toEqual(expect.arrayContaining(["OPERATOR_NAME", "SUPPORT_EMAIL", "ABUSE_REPORT_EMAIL", "PRIVACY_CONTACT_EMAIL", "POLICY_EFFECTIVE_DATE", "LEGAL_JURISDICTION"]));
+    expect(() => parseEnv({ ...productionEnv, PUBLIC_LAUNCH: "true", OPERATOR_NAME: "Example operator", SUPPORT_URL: "https://support.example.test", ABUSE_REPORT_EMAIL: "abuse@example.test", PRIVACY_CONTACT_EMAIL: "privacy@example.test", POLICY_EFFECTIVE_DATE: "2026-07-16", LEGAL_JURISDICTION: "France" })).not.toThrow();
+  });
+
+  it("rejects unsafe contact URL schemes", () => {
+    expect(issuePaths({ ...localEnv, SUPPORT_URL: "javascript:alert(1)" })).toContain("SUPPORT_URL");
   });
 });

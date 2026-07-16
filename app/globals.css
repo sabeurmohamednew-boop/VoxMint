@@ -308,6 +308,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 
 html.light .panel { box-shadow: 0 12px 30px rgba(43, 53, 79, 0.08); }
 html.light .field { border-color: #cbd3e2; background: #ffffff; }
+html.light .field::placeholder { color: #6b7588; }
 html.light .field:hover { border-color: #aeb8ca; }
 html.light .field:disabled { border-color: #d8deea; background: #e9edf4; color: #737f93; }
 html.light .upload-zone { border-color: #b9c3d4; background: #f8f9fd; }
@@ -316,6 +317,7 @@ html.light .audio-shell { background: #f7f9fc; }
 html.light .voice-card:hover { background: #f2f4fa; }
 html.light .button-secondary { background: #f5f7fb; }
 html.light .button-secondary:hover { background: #eeeaff; }
+html.light .button-primary:disabled, html.light .button-secondary:disabled, html.light .button-ghost:disabled { opacity: 0.64; color: #626d80; }
 html.light nav a[aria-current="page"] { background: #eee9ff; color: #5e31bd; }
 html.light .menu-content, html.light .select-content { box-shadow: 0 18px 42px rgba(43, 53, 79, 0.18); }
 

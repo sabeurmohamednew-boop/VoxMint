@@ -1,8 +1,10 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { NewVoiceClient } from "@/components/voices/new-voice-client";
+import { getPublicProviderInfo } from "@/lib/providers";
 
 export default function NewVoicePage() {
+  const providerInfo = getPublicProviderInfo();
   return (
     <>
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -11,7 +13,7 @@ export default function NewVoicePage() {
         </div>
         <Link href="/dashboard" className="button-secondary px-4"><ArrowLeft className="h-4 w-4" />Back to dashboard</Link>
       </header>
-      <div className="mx-auto max-w-[760px]"><NewVoiceClient /></div>
+      <div className="mx-auto max-w-[760px]"><NewVoiceClient operationsEnabled={providerInfo.operationsEnabled !== false} /></div>
     </>
   );
 }

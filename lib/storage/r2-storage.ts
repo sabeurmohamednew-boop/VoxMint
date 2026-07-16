@@ -65,6 +65,9 @@ export class R2ObjectStorage implements ObjectStorage {
       body: response.Body.transformToWebStream(),
       size: Number(response.ContentLength ?? 0),
       contentType: response.ContentType ?? "application/octet-stream",
+      etag: response.ETag,
+      createdAt: response.LastModified,
+      metadata: response.Metadata,
     };
   }
 

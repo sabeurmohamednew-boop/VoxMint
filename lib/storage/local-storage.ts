@@ -18,13 +18,15 @@ export class LocalObjectStorage implements ObjectStorage {
   private readonly root: string;
 
   constructor(rootOverride?: string) {
-    this.root = rootOverride
-      ? path.resolve(rootOverride)
-      : path.resolve(/* turbopackIgnore: true */ process.cwd(), getEnv().LOCAL_STORAGE_PATH);
-    const workspace = `${path.resolve(process.cwd())}${path.sep}`;
-    if (!rootOverride && !`${this.root}${path.sep}`.startsWith(workspace)) {
-      throw new Error("LOCAL_STORAGE_PATH must stay inside the project directory.");
+    if (rootOverride) {
+      this.root = path.resolve(rootOverride);
+      return;
     }
+    const configured = getEnv().LOCAL_STORAGE_PATH.replaceAll("\\", "/");
+    if (!/^\.data\/[a-zA-Z0-9/_-]+$/.test(configured) || configured.includes("..")) {
+      throw new Error("LOCAL_STORAGE_PATH must stay inside the project's .data directory.");
+    }
+    this.root = path.join(process.cwd(), ".data", configured.slice(".data/".length));
   }
 
   private resolve(key: string): string {
@@ -61,6 +63,9 @@ export class LocalObjectStorage implements ObjectStorage {
       body: Readable.toWeb(stream) as ReadableStream<Uint8Array>,
       size: range ? range.end - range.start + 1 : metadata.size,
       contentType: metadata.contentType,
+      etag: metadata.etag,
+      createdAt: metadata.createdAt,
+      metadata: metadata.metadata,
     };
   }
 

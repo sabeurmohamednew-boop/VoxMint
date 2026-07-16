@@ -117,7 +117,7 @@ model Voice {
   userId             String
   provider           String
   providerVoiceId    String
-  idempotencyKey    String?
+  idempotencyKey     String?
   name               String
   description        String?
   primaryLanguage    String          @default("en")

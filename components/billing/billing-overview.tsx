@@ -21,12 +21,11 @@ export function BillingOverview({ state }: { state: PublicBillingState }) {
       <section className="panel p-6">
         <div className="flex items-center gap-2 text-[#9a67f0]">
           <Gauge className="h-5 w-5" />
-          <p className="text-xs font-semibold uppercase tracking-[.12em]">Provider allowance</p>
+          <p className="text-xs font-semibold uppercase tracking-[.12em]">Configured deployment ceiling</p>
         </div>
         <h2 className="mt-3 text-xl font-bold">{state.providerAllowanceLabel}</h2>
         <p className="mt-2 text-sm leading-6 text-[var(--foreground-secondary)]">
-          {state.characterAllowance.toLocaleString()} characters and {state.voiceAllowance} saved voices
-          are available under the active provider allowance.
+          This deployment tracks up to {state.characterAllowance.toLocaleString()} generated characters and {state.voiceAllowance} registered voices. These values are not a live provider-account balance.
         </p>
         <Link href="/usage" className="button-secondary mt-5 px-4">View usage</Link>
       </section>

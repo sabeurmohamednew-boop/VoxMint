@@ -10,7 +10,7 @@ import { assertVoiceOperationsEnabled, consumeOperationLimits, getRateLimiter, c
 import type { VoiceDto } from "@/lib/types/dto";
 import { updateVoiceSchema } from "@/lib/validation/schemas";
 import { voiceDto } from "@/server/services/mappers";
-import { planLimits } from "@/server/services/usage-service";
+import { currentPeriodKey, planLimits } from "@/server/services/usage-service";
 import { requireOwnedVoice } from "@/server/services/ownership-service";
 import { getObjectStorage } from "@/lib/storage";
 import { logger, safeUserId } from "@/lib/logging/logger";
@@ -79,25 +79,39 @@ export async function cloneVoiceForUser(input: {
     include: { _count: { select: { generations: { where: { deletedAt: null } } } } },
   });
   if (existing) return voiceDto(existing);
+  const releaseRequest = await getRateLimiter().acquire(`clone-request:${input.userId}:${idempotencyKey}`, 1, 180);
+  try {
+  const duplicateAfterLock = await prisma.voice.findUnique({
+    where: { userId_idempotencyKey: { userId: input.userId, idempotencyKey } },
+    include: { _count: { select: { generations: { where: { deletedAt: null } } } } },
+  });
+  if (duplicateAfterLock) return voiceDto(duplicateAfterLock);
   await consumeOperationLimits("clone", input.userId, input.requestIp ?? "unknown");
   const provider = getVoiceProvider();
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: input.userId }, select: { plan: true } });
-  const activeVoices = await prisma.voice.count({
-    where: {
-      userId: input.userId,
-      provider: provider.name,
-      deletedAt: null,
-      status: { in: ["PROCESSING", "READY"] },
-    },
-  });
-  if (activeVoices >= planLimits[user.plan].voices) {
-    throw new AppError("VOICE_QUOTA_EXCEEDED", "You have reached your saved voice limit.", 403);
-  }
-
   if (!provider.capabilities.cloneLanguages.includes(input.language)) {
     throw new AppError("UNSUPPORTED_LANGUAGE", "This language is not supported for voice creation.", 422);
   }
-
+  const periodKey = currentPeriodKey();
+  await prisma.$transaction(async (transaction) => {
+    await transaction.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${input.userId} FOR UPDATE`;
+    const user = await transaction.user.findUniqueOrThrow({ where: { id: input.userId }, select: { plan: true } });
+    const activeVoices = await transaction.voice.count({
+      where: { userId: input.userId, provider: provider.name, deletedAt: null, status: { in: ["PROCESSING", "READY"] } },
+    });
+    if (activeVoices >= planLimits[user.plan].voices) {
+      throw new AppError("VOICE_QUOTA_EXCEEDED", "You have reached your saved voice limit.", 403);
+    }
+    const usageIdempotencyKey = `clone:${idempotencyKey}`;
+    const prior = await transaction.usageLedger.findUnique({ where: { userId_idempotencyKey: { userId: input.userId, idempotencyKey: usageIdempotencyKey } } });
+    if (prior?.status === "RESERVED" && Date.now() - prior.createdAt.getTime() < 5 * 60_000) {
+      throw new AppError("CLONE_IN_PROGRESS", "This voice request is already in progress.", 409);
+    }
+    if (prior) {
+      await transaction.usageLedger.update({ where: { id: prior.id }, data: { status: "RESERVED", periodKey } });
+    } else {
+      await transaction.usageLedger.create({ data: { userId: input.userId, type: "VOICE_CLONE", quantity: 1, status: "RESERVED", periodKey, idempotencyKey: usageIdempotencyKey } });
+    }
+  });
   let cloned: Awaited<ReturnType<typeof provider.cloneVoice>>;
   try {
     cloned = await withProviderConcurrency(input.userId, () => provider.cloneVoice({
@@ -109,6 +123,7 @@ export async function cloneVoiceForUser(input: {
       language: input.language,
     }));
   } catch (error) {
+    await prisma.usageLedger.updateMany({ where: { userId: input.userId, idempotencyKey: `clone:${idempotencyKey}`, status: "RESERVED" }, data: { status: "RELEASED" } }).catch(() => undefined);
     if (error instanceof ProviderError) throw new AppError("PROVIDER_ERROR", error.safeMessage, 502);
     throw error;
   }
@@ -142,6 +157,12 @@ export async function cloneVoiceForUser(input: {
           userAgentHash: input.userAgentHash,
         },
       });
+      await transaction.usageLedger.updateMany({ where: { userId: input.userId, idempotencyKey: `clone:${idempotencyKey}`, status: "RESERVED" }, data: { status: "COMMITTED" } });
+      await transaction.monthlyUsage.upsert({
+        where: { userId_periodKey: { userId: input.userId, periodKey } },
+        create: { userId: input.userId, periodKey, voicesCreated: 1 },
+        update: { voicesCreated: { increment: 1 } },
+      });
       return created;
     });
     logger.info("voice.clone", { requestId: input.requestId, user: safeUserId(input.userId), provider: provider.name, status: "ready", latencyMs: Date.now() - startedAt });
@@ -157,8 +178,12 @@ export async function cloneVoiceForUser(input: {
       include: { _count: { select: { generations: { where: { deletedAt: null } } } } },
     }).catch(() => null);
     if (duplicate) return voiceDto(duplicate);
+    await prisma.usageLedger.updateMany({ where: { userId: input.userId, idempotencyKey: `clone:${idempotencyKey}`, status: "RESERVED" }, data: { status: "RELEASED" } }).catch(() => undefined);
     logger.error("voice.clone", { requestId: input.requestId, user: safeUserId(input.userId), provider: provider.name, status: "failed", latencyMs: Date.now() - startedAt });
     throw error;
+  }
+  } finally {
+    await releaseRequest();
   }
 }
 
@@ -199,8 +224,11 @@ export async function deleteVoiceForUser(userId: string, voiceId: string): Promi
   await getRateLimiter().consume(`voice-mutation:${userId}`, configuredRateLimits().mutation);
   const voice = await prisma.voice.findFirst({ where: { id: voiceId, userId } });
   if (!voice || voice.status === "DELETED") return;
-  await prisma.voice.update({ where: { id: voice.id }, data: { status: "DELETING" } });
   const provider = getVoiceProvider();
+  if (voice.provider === "cartesia" && provider.name !== "cartesia") {
+    throw new AppError("VOICE_PROVIDER_MISMATCH", "Switch to Cartesia before deleting this Cartesia voice.", 409);
+  }
+  await prisma.voice.update({ where: { id: voice.id }, data: { status: "DELETING" } });
   try {
     if (
       isVoiceCompatibleWithProvider(voice.provider, provider.name) &&

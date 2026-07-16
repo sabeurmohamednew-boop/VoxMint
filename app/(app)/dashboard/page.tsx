@@ -12,7 +12,7 @@ export default async function DashboardPage({
 }) {
   const user = await requireUser();
   const providerInfo = getPublicProviderInfo();
-  const [voices, generations, usage] = await Promise.all([listVoices(user.id), listGenerations(user.id, 1), getUsage(user.id)]);
+  const [voices, generations, usage] = await Promise.all([listVoices(user.id), listGenerations(user.id, 1, providerInfo.name), getUsage(user.id)]);
   const requestedVoiceId = (await searchParams).voice;
   const requested = typeof requestedVoiceId === "string" ? requestedVoiceId : null;
   const usableVoices = voices.filter((voice) => voice.status === "READY" && voice.provider === providerInfo.name);

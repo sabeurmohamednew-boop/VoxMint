@@ -34,9 +34,11 @@ function humanSize(bytes: number) {
 export function CloneVoicePanel({
   onCreated,
   onboardingStep,
+  operationsEnabled = true,
 }: {
   onCreated: (voice: VoiceDto) => void;
   onboardingStep?: number;
+  operationsEnabled?: boolean;
 }) {
   const [state, dispatch] = useReducer(reducer, { phase: "idle", file: null, error: null });
   const [name, setName] = useState("");
@@ -55,10 +57,11 @@ export function CloneVoicePanel({
 
   const nameValid = voiceNameSchema.safeParse(name).success;
   const busy = ["client-validating", "uploading", "cloning", "saving"].includes(state.phase);
-  const canSubmit = Boolean(state.file && nameValid && consent && !busy);
+  const canSubmit = Boolean(operationsEnabled && state.file && nameValid && consent && !busy);
 
   function selectFile(file: File | undefined) {
     if (!file) return;
+    idempotencyKey.current = crypto.randomUUID();
     setDuration(null);
     dispatch({ type: "select", file });
   }
@@ -111,6 +114,7 @@ export function CloneVoicePanel({
         <div><h2 id="clone-title" className="text-[19px] font-semibold tracking-[-0.015em]">Clone a Voice</h2><p className="mt-1 text-[13px] leading-5 text-[var(--foreground-secondary)]">Upload a clean sample of a voice you own or have permission to use.</p></div>
       </div>
       <form className="mt-5 space-y-4" onSubmit={submit}>
+        {!operationsEnabled && <p className="rounded-lg border border-[var(--warning)]/30 bg-[var(--warning)]/5 p-3 text-sm text-[var(--foreground-secondary)]" role="status">New voice operations are temporarily paused. Existing voices and generated audio remain available.</p>}
         <input ref={inputRef} className="sr-only" type="file" accept=".flac,.mp3,.mpeg,.mpga,.oga,.ogg,.wav,.webm,audio/flac,audio/mpeg,audio/ogg,audio/wav,audio/webm" onChange={(event) => selectFile(event.target.files?.[0])} />
         {!state.file ? (
           <div

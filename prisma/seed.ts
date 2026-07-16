@@ -30,16 +30,16 @@ function mockWav(durationMs: number): Uint8Array {
 }
 
 async function main() {
+  if (!shouldSeedDemoVoices(process.env.VOICE_PROVIDER)) {
+    console.info("Demo data skipped because VOICE_PROVIDER is not mock.");
+    return;
+  }
+
   const user = await prisma.user.upsert({
     where: { email: demoEmail },
     update: { deletedAt: null, name: "Maya Chen", plan: "PRO" },
     create: { email: demoEmail, name: "Maya Chen", emailVerified: new Date(), theme: "DARK", plan: "PRO" },
   });
-
-  if (!shouldSeedDemoVoices(process.env.VOICE_PROVIDER)) {
-    console.info("Demo user seeded; mock voice records skipped because VOICE_PROVIDER is not mock.");
-    return;
-  }
 
   const voiceInputs = [
     { providerVoiceId: "mock_seed_studio", name: "Studio Narration", description: "Balanced and clear for product walkthroughs.", language: "en" },

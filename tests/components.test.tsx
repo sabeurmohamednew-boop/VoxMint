@@ -31,6 +31,7 @@ const mockProviderInfo: ProviderInfoDto = {
   label: "Demo Provider",
   isDemo: true,
   showBranding: true,
+  operationsEnabled: true,
   capabilities: { instantClone: true, multilingual: true },
 };
 
@@ -39,6 +40,7 @@ const cartesiaProviderInfo: ProviderInfoDto = {
   label: "Cartesia",
   isDemo: false,
   showBranding: true,
+  operationsEnabled: true,
   capabilities: { instantClone: true, multilingual: true },
 };
 
@@ -91,6 +93,14 @@ describe("generation panel", () => {
   it("does not show a decorative delivery-style control", () => {
     render(<ToastProvider><GenerateVoicePanel voices={[]} selectedVoiceId={null} onSelectedVoice={vi.fn()} generation={null} onGenerated={vi.fn()} onDeleted={vi.fn()} usage={usage} providerInfo={cartesiaProviderInfo} /></ToastProvider>);
     expect(screen.queryByText("Normal")).not.toBeInTheDocument();
+  });
+
+  it("honestly blocks new operations when the deployment switch is off", async () => {
+    const activeVoice = voice("cartesia-voice", "cartesia", "Paused Voice");
+    render(<ToastProvider><GenerateVoicePanel voices={[activeVoice]} selectedVoiceId={activeVoice.id} onSelectedVoice={vi.fn()} generation={null} onGenerated={vi.fn()} onDeleted={vi.fn()} usage={{ ...usage, activeProvider: "cartesia" }} providerInfo={{ ...cartesiaProviderInfo, operationsEnabled: false }} /></ToastProvider>);
+    await userEvent.type(screen.getByLabelText("Enter text"), "Hello");
+    expect(screen.getByRole("button", { name: /Generate Voiceover/i })).toBeDisabled();
+    expect(screen.getByText(/temporarily paused/i)).toBeInTheDocument();
   });
 
   it("excludes mock voices and keeps Cartesia voices selectable in Cartesia mode", async () => {

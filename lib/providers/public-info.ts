@@ -3,7 +3,7 @@ import type { VoiceProvider } from "@/lib/providers/voice-provider";
 
 export function toPublicProviderInfo(
   provider: Pick<VoiceProvider, "name" | "capabilities">,
-): ProviderInfoDto {
+): Omit<ProviderInfoDto, "operationsEnabled"> {
   const isDemo = provider.name === "mock";
   return {
     name: provider.name,
