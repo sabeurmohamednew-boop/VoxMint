@@ -5,9 +5,9 @@ export type PutObjectInput = {
   metadata?: Record<string, string>;
 };
 
-export type StoredObject = { key: string; size: number; contentType: string };
+export type StoredObject = { key: string; size: number; contentType: string; etag?: string; createdAt?: Date };
 export type ObjectByteRange = { start: number; end: number };
-export type StoredObjectMetadata = { size: number; contentType: string };
+export type StoredObjectMetadata = { size: number; contentType: string; etag?: string; createdAt?: Date; metadata?: Record<string, string> };
 export type StoredObjectStream = StoredObjectMetadata & {
   body: ReadableStream<Uint8Array>;
 };

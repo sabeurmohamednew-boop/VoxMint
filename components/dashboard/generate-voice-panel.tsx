@@ -2,7 +2,7 @@
 
 import { Eraser, Mic2, Plus, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AudioPlayer } from "@/components/audio/audio-player";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AppSelect } from "@/components/ui/app-select";
@@ -39,6 +39,9 @@ export function GenerateVoicePanel({
   const [stateLabel, setStateLabel] = useState("Generate Voiceover");
   const [error, setError] = useState<string | null>(null);
   const [clearOpen, setClearOpen] = useState(false);
+  const idempotencyKey = useRef(crypto.randomUUID());
+  const outputRef = useRef<HTMLDivElement>(null);
+  const focusNextOutput = useRef(false);
   const { showToast } = useToast();
   const selectableVoices = useMemo(
     () =>
@@ -70,8 +73,24 @@ export function GenerateVoicePanel({
   useEffect(() => {
     const draft = sessionStorage.getItem("voxmint-script-draft");
     if (draft) window.requestAnimationFrame(() => setText(draft));
+    const savedKey = sessionStorage.getItem("voxmint-generation-key");
+    if (savedKey) idempotencyKey.current = savedKey;
+    else sessionStorage.setItem("voxmint-generation-key", idempotencyKey.current);
   }, []);
   useEffect(() => { if (text) sessionStorage.setItem("voxmint-script-draft", text); else sessionStorage.removeItem("voxmint-script-draft"); }, [text]);
+  useEffect(() => {
+    if (!generation || !focusNextOutput.current) return;
+    focusNextOutput.current = false;
+    const output = outputRef.current;
+    if (!output) return;
+    output.focus({ preventScroll: true });
+    output.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "nearest" });
+  }, [generation]);
+
+  function resetGenerationKey() {
+    idempotencyKey.current = crypto.randomUUID();
+    sessionStorage.setItem("voxmint-generation-key", idempotencyKey.current);
+  }
 
   async function generate() {
     if (!selected || !canGenerate) return;
@@ -81,10 +100,12 @@ export function GenerateVoicePanel({
       const result = await fetchJson<{ generation: GenerationDto }>("/api/generations", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ voiceId: selected.id, text, language: selected.primaryLanguage, idempotencyKey: crypto.randomUUID() }),
+        body: JSON.stringify({ voiceId: selected.id, text, language: selected.primaryLanguage, idempotencyKey: idempotencyKey.current }),
       });
       window.clearTimeout(timer); setStateLabel("Storing audio…");
+      focusNextOutput.current = true;
       onGenerated(result.generation); showToast("Voiceover generated");
+      resetGenerationKey();
     } catch (reason) {
       window.clearTimeout(timer);
       const message = reason instanceof Error ? reason.message : "Generation failed.";
@@ -95,6 +116,7 @@ export function GenerateVoicePanel({
   }
 
   function clearText() {
+    resetGenerationKey();
     if (count > 500) setClearOpen(true); else setText("");
   }
 
@@ -108,7 +130,7 @@ export function GenerateVoicePanel({
       {error && <p className="mt-3 rounded-lg border border-[var(--danger)]/30 bg-[var(--danger)]/10 px-3 py-2.5 text-sm text-[#ff9aaa]" role="alert">{error}</p>}
       <button type="button" className="button-primary mt-4 w-full" disabled={!canGenerate} aria-describedby={disabledReason ? "generation-disabled-reason" : undefined} onClick={() => void generate()}><Sparkles className="h-[18px] w-[18px]" />{stateLabel}</button>
       {disabledReason && <p id="generation-disabled-reason" className="mt-2 text-center text-[11.5px] leading-5 text-[var(--muted)]">{disabledReason}</p>}
-      <div className="mt-6"><h3 className="mb-3 text-[13px] font-semibold">Output</h3><AudioPlayer key={generation?.id ?? "empty"} generation={generation} selectedVoiceId={selectedVoiceId} onDelete={onDeleted} /></div>
+      <div ref={outputRef} tabIndex={-1} className="mt-6 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#8b55e8]"><h3 className="mb-3 text-[13px] font-semibold">Output</h3><AudioPlayer key={generation?.id ?? "empty"} generation={generation} selectedVoiceId={selectedVoiceId} onDelete={onDeleted} /></div>
       <ConfirmDialog open={clearOpen} onOpenChange={setClearOpen} title="Clear this script?" description="This draft is fairly long. Clearing it cannot be undone." confirmLabel="Clear script" onConfirm={() => { setText(""); setClearOpen(false); }} />
     </section>
   );

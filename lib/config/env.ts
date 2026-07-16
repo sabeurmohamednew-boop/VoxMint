@@ -12,9 +12,16 @@ function optionalEnvString(schema: z.ZodString = z.string()) {
   return z.preprocess(emptyStringToUndefined, schema.optional());
 }
 
+const safeHttpUrl = z.string().url().refine((value) => ["http:", "https:"].includes(new URL(value).protocol), "Use an HTTP(S) URL.");
+
 const booleanString = z
   .enum(["true", "false"])
   .default("false")
+  .transform((value) => value === "true");
+
+const enabledBooleanString = z
+  .enum(["true", "false"])
+  .default("true")
   .transform((value) => value === "true");
 
 const positiveInteger = (fallback: number) =>
@@ -47,18 +54,37 @@ export const envSchema = z
     UPSTASH_REDIS_REST_URL: optionalEnvString(z.string().url()),
     UPSTASH_REDIS_REST_TOKEN: optionalEnvString(),
     DEV_BYPASS_AUTH: booleanString,
+    E2E_TEST_AUTH: booleanString,
     ALLOW_MOCK_PROVIDER_IN_PRODUCTION: booleanString,
     NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
     VOICE_SAMPLE_MIN_SECONDS: positiveInteger(3),
     VOICE_SAMPLE_MAX_SECONDS: positiveInteger(10),
     VOICE_SAMPLE_MAX_BYTES: positiveInteger(10 * 1024 * 1024),
     GENERATION_MAX_CHARACTERS: positiveInteger(5000),
+    VOICE_CREATIONS_PER_HOUR: positiveInteger(3),
+    GENERATIONS_PER_MINUTE: positiveInteger(20),
+    DOWNLOADS_PER_MINUTE: positiveInteger(120),
+    DAILY_CHARACTER_LIMIT: positiveInteger(25_000),
+    MONTHLY_CHARACTER_LIMIT: positiveInteger(100_000),
+    GLOBAL_DAILY_CHARACTER_LIMIT: positiveInteger(1_000_000),
+    MAX_CONCURRENT_PROVIDER_REQUESTS: positiveInteger(1),
+    VOICE_OPERATIONS_ENABLED: enabledBooleanString,
+    PUBLIC_LAUNCH: booleanString,
+    OPERATOR_NAME: optionalEnvString(),
     SUPPORT_EMAIL: optionalEnvString(z.string().email()),
-    ABUSE_REPORT_URL: optionalEnvString(z.string().url()),
+    SUPPORT_URL: optionalEnvString(safeHttpUrl),
+    ABUSE_REPORT_EMAIL: optionalEnvString(z.string().email()),
+    ABUSE_REPORT_URL: optionalEnvString(safeHttpUrl),
+    PRIVACY_CONTACT_EMAIL: optionalEnvString(z.string().email()),
+    POLICY_EFFECTIVE_DATE: optionalEnvString(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use an ISO date (YYYY-MM-DD).")),
+    LEGAL_JURISDICTION: optionalEnvString(),
     RETENTION_WORKER_ENABLED: booleanString,
     SHOW_PROVIDER_BRANDING: z.enum(["true", "false"]).default("true").transform((value) => value === "true"),
   })
   .superRefine((env, context) => {
+    if (env.E2E_TEST_AUTH && env.NODE_ENV !== "test") {
+      context.addIssue({ code: "custom", path: ["E2E_TEST_AUTH"], message: "E2E_TEST_AUTH is allowed only when NODE_ENV=test." });
+    }
     if (env.VOICE_SAMPLE_MIN_SECONDS >= env.VOICE_SAMPLE_MAX_SECONDS) {
       context.addIssue({
         code: "custom",
@@ -167,6 +193,24 @@ export const envSchema = z
         message: "Persistent rate limiting is required in production.",
       });
     }
+
+    if (env.PUBLIC_LAUNCH) {
+      const requiredLaunchValues = [
+        ["OPERATOR_NAME", env.OPERATOR_NAME],
+        ["PRIVACY_CONTACT_EMAIL", env.PRIVACY_CONTACT_EMAIL],
+        ["POLICY_EFFECTIVE_DATE", env.POLICY_EFFECTIVE_DATE],
+        ["LEGAL_JURISDICTION", env.LEGAL_JURISDICTION],
+      ] as const;
+      for (const [key, value] of requiredLaunchValues) {
+        if (!value) context.addIssue({ code: "custom", path: [key], message: `Required when PUBLIC_LAUNCH=true.` });
+      }
+      if (!env.SUPPORT_EMAIL && !env.SUPPORT_URL) {
+        context.addIssue({ code: "custom", path: ["SUPPORT_EMAIL"], message: "A support email or URL is required for public launch." });
+      }
+      if (!env.ABUSE_REPORT_EMAIL && !env.ABUSE_REPORT_URL) {
+        context.addIssue({ code: "custom", path: ["ABUSE_REPORT_EMAIL"], message: "An abuse-report email or URL is required for public launch." });
+      }
+    }
   });
 
 export type AppEnv = z.infer<typeof envSchema>;
@@ -187,12 +231,26 @@ export function isDemoAuthEnabled(): boolean {
   return env.NODE_ENV !== "production" && env.DEV_BYPASS_AUTH;
 }
 
+export function isE2eTestAuthEnabled(): boolean {
+  const env = getEnv();
+  return env.NODE_ENV === "test" && env.E2E_TEST_AUTH;
+}
+
 export function getPublicOperationsInfo() {
   const env = getEnv();
   return {
     developmentSession: env.NODE_ENV !== "production" && env.DEV_BYPASS_AUTH,
+    testSession: env.NODE_ENV === "test" && env.E2E_TEST_AUTH,
+    publicLaunch: env.PUBLIC_LAUNCH,
+    voiceOperationsEnabled: env.VOICE_OPERATIONS_ENABLED,
+    operatorName: env.OPERATOR_NAME ?? null,
     retentionWorkerEnabled: env.RETENTION_WORKER_ENABLED,
     supportEmail: env.SUPPORT_EMAIL ?? null,
+    supportUrl: env.SUPPORT_URL ?? null,
+    abuseReportEmail: env.ABUSE_REPORT_EMAIL ?? null,
     abuseReportUrl: env.ABUSE_REPORT_URL ?? null,
+    privacyContactEmail: env.PRIVACY_CONTACT_EMAIL ?? null,
+    policyEffectiveDate: env.POLICY_EFFECTIVE_DATE ?? null,
+    legalJurisdiction: env.LEGAL_JURISDICTION ?? null,
   } as const;
 }

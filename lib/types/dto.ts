@@ -9,6 +9,8 @@ export type VoiceDto = {
   lastUsedAt: string | null;
   sourceDurationMs: number;
   generationCount: number;
+  reconciliationState?: "provider_missing" | null;
+  latestGeneration?: GenerationDto | null;
   selected?: boolean;
 };
 

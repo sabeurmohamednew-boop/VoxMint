@@ -5,6 +5,7 @@ import { requireApiUser } from "@/lib/auth/session";
 import { getEnv } from "@/lib/config/env";
 import { cloneMetadataSchema } from "@/lib/validation/schemas";
 import { cloneVoiceForUser } from "@/server/services/voice-service";
+import { assertSameOriginMutation, requestIp } from "@/lib/security/request-origin";
 
 export const runtime = "nodejs";
 
@@ -13,6 +14,7 @@ export async function POST(request: Request) {
   const user = await requireApiUser();
   if (!user) return unauthorized(id);
   try {
+    assertSameOriginMutation(request);
     const declaredLength = Number(request.headers.get("content-length") ?? 0);
     if (declaredLength > getEnv().VOICE_SAMPLE_MAX_BYTES + 64 * 1024) {
       throw new AppError("PAYLOAD_TOO_LARGE", "The upload is too large.", 413);
@@ -38,6 +40,9 @@ export async function POST(request: Request) {
       language: metadata.language,
       audio,
       userAgentHash,
+      requestIp: requestIp(request),
+      idempotencyKey: request.headers.get("idempotency-key") ?? undefined,
+      requestId: id,
     });
     return ok({ voice }, id, { status: 201 });
   } catch (error) {

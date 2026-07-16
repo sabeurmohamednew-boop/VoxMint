@@ -14,6 +14,7 @@ export async function getAccount(userId: string) {
       id: true,
       name: true,
       email: true,
+      emailVerified: true,
       image: true,
       plan: true,
       preferredLanguage: true,
@@ -23,7 +24,7 @@ export async function getAccount(userId: string) {
     },
   });
   if (!account) throw new AppError("ACCOUNT_NOT_FOUND", "Account not found.", 404);
-  return account;
+  return { ...account, emailVerified: Boolean(account.emailVerified) };
 }
 
 export async function updateAccount(userId: string, unknownInput: unknown) {

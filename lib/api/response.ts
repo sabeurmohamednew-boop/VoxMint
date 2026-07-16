@@ -1,4 +1,5 @@
 import { ZodError } from "zod";
+import { logger } from "@/lib/logging/logger";
 
 export class AppError extends Error {
   constructor(
@@ -17,17 +18,20 @@ export function requestId(request: Request): string {
 
 export function apiError(error: unknown, id: string): Response {
   if (error instanceof ZodError) {
+    logger.info("api.error", { requestId: id, category: "validation", status: 422 });
     return Response.json(
       { error: { code: "VALIDATION_ERROR", message: error.issues[0]?.message ?? "Invalid request.", requestId: id } },
       { status: 422, headers: { "x-request-id": id } },
     );
   }
   if (error instanceof AppError) {
+    logger.info("api.error", { requestId: id, category: error.code, status: error.status });
     return Response.json(
       { error: { code: error.code, message: error.message, requestId: id } },
       { status: error.status, headers: { "x-request-id": id } },
     );
   }
+  logger.error("api.error", { requestId: id, category: error instanceof Error ? error.name : "unknown", status: 500 });
   return Response.json(
     { error: { code: "INTERNAL_ERROR", message: "Something went wrong. Try again.", requestId: id } },
     { status: 500, headers: { "x-request-id": id } },

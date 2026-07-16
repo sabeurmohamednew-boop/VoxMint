@@ -1,14 +1,20 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
+
 type LogValue = string | number | boolean | null | undefined;
 type LogContext = Record<string, LogValue>;
 
-const blockedKeys = new Set(["apiKey", "token", "script", "audio", "signedUrl"]);
+const blockedKeys = new Set(["apiKey", "token", "script", "text", "audio", "signedUrl", "authorization", "objectKey", "password"]);
 
 function sanitize(context: LogContext): LogContext {
   return Object.fromEntries(
     Object.entries(context).filter(([key]) => !blockedKeys.has(key)),
   );
+}
+
+export function safeUserId(userId: string): string {
+  return createHash("sha256").update(`voxmint-user:${userId}`).digest("hex").slice(0, 16);
 }
 
 export const logger = {

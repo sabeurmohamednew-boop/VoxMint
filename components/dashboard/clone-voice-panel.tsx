@@ -47,6 +47,7 @@ export function CloneVoicePanel({
   const [duration, setDuration] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const idempotencyKey = useRef(crypto.randomUUID());
   const { showToast } = useToast();
   const previewUrl = useMemo(() => (state.file ? URL.createObjectURL(state.file) : null), [state.file]);
 
@@ -75,10 +76,15 @@ export function CloneVoicePanel({
     dispatch({ type: "phase", phase: "uploading" });
     const phaseTimer = window.setTimeout(() => dispatch({ type: "phase", phase: "cloning" }), 450);
     try {
-      const result = await fetchJson<{ voice: VoiceDto }>("/api/voices/clone", { method: "POST", body: data });
+      const result = await fetchJson<{ voice: VoiceDto }>("/api/voices/clone", {
+        method: "POST",
+        headers: { "idempotency-key": idempotencyKey.current },
+        body: data,
+      });
       window.clearTimeout(phaseTimer);
       dispatch({ type: "phase", phase: "saving" });
       onCreated(result.voice);
+      idempotencyKey.current = crypto.randomUUID();
       dispatch({ type: "phase", phase: "success" });
       showToast("Voice created");
       setName(""); setDescription(""); setConsent(false); setDuration(null);

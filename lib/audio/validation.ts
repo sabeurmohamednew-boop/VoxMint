@@ -27,6 +27,8 @@ function sanitizedUploadName(name: string, extension: string): string {
     .replace(/\.[^.]+$/, "")
     .normalize("NFKC")
     .replace(/[^\p{L}\p{N} ._'\-]/gu, "")
+    .replace(/\.{2,}/g, ".")
+    .replace(/^[.\s]+/, "")
     .trim()
     .slice(0, 80) || "voice-sample";
   return `${base}.${extension}`;
@@ -46,18 +48,39 @@ export async function validateAudioFile(file: File): Promise<ValidatedAudio> {
   }
 
   let durationSeconds: number | undefined;
+  let sampleRate: number | undefined;
+  let channelCount: number | undefined;
+  let codec: string | undefined;
+  let bitsPerSample: number | undefined;
   try {
     const metadata = await parseBuffer(bytes, {
       mimeType: detected.mime,
       size: bytes.byteLength,
     });
     durationSeconds = metadata.format.duration;
+    sampleRate = metadata.format.sampleRate;
+    channelCount = metadata.format.numberOfChannels;
+    codec = metadata.format.codec;
+    bitsPerSample = metadata.format.bitsPerSample;
   } catch {
     throw new AppError("UNDECODABLE_AUDIO", "This audio file could not be decoded.", 422);
   }
 
   if (!durationSeconds || !Number.isFinite(durationSeconds)) {
     throw new AppError("UNKNOWN_DURATION", "The sample duration could not be verified.", 422);
+  }
+  if (!sampleRate || !Number.isFinite(sampleRate) || sampleRate < 8_000 || sampleRate > 192_000) {
+    throw new AppError("UNSUPPORTED_SAMPLE_RATE", "Use audio with a sample rate between 8 kHz and 192 kHz.", 422);
+  }
+  if (!channelCount || !Number.isInteger(channelCount) || channelCount < 1 || channelCount > 2) {
+    throw new AppError("UNSUPPORTED_CHANNEL_COUNT", "Use mono or stereo audio with one clear speaker.", 422);
+  }
+  if (codec && !/^(pcm|ieee[_ -]?float|mpeg|flac|vorbis|opus)/i.test(codec)) {
+    throw new AppError("UNSUPPORTED_CODEC", "The audio container uses an unsupported codec.", 422);
+  }
+  const estimatedDecodedBytes = durationSeconds * sampleRate * channelCount * Math.max(bitsPerSample ?? 32, 16) / 8;
+  if (!Number.isFinite(estimatedDecodedBytes) || estimatedDecodedBytes > 256 * 1024 * 1024) {
+    throw new AppError("DECODED_AUDIO_TOO_LARGE", "The decoded audio is too large to process safely.", 422);
   }
   if (durationSeconds < env.VOICE_SAMPLE_MIN_SECONDS) {
     throw new AppError("SAMPLE_TOO_SHORT", "The sample is too short.", 422);

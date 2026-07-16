@@ -31,7 +31,7 @@ export class R2ObjectStorage implements ObjectStorage {
   }
 
   async put(input: PutObjectInput) {
-    await this.client.send(
+    const response = await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
         Key: input.key,
@@ -40,7 +40,7 @@ export class R2ObjectStorage implements ObjectStorage {
         Metadata: input.metadata,
       }),
     );
-    return { key: input.key, size: input.bytes.byteLength, contentType: input.contentType };
+    return { key: input.key, size: input.bytes.byteLength, contentType: input.contentType, etag: response.ETag, createdAt: new Date() };
   }
 
   async head(key: string) {
@@ -48,6 +48,9 @@ export class R2ObjectStorage implements ObjectStorage {
     return {
       size: Number(response.ContentLength ?? 0),
       contentType: response.ContentType ?? "application/octet-stream",
+      etag: response.ETag,
+      createdAt: response.LastModified,
+      metadata: response.Metadata,
     };
   }
 

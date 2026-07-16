@@ -1,6 +1,7 @@
 import { apiError, ok, requestId, unauthorized } from "@/lib/api/response";
 import { requireApiUser } from "@/lib/auth/session";
 import { generateForUser, listGenerations } from "@/server/services/generation-service";
+import { assertSameOriginMutation, requestIp } from "@/lib/security/request-origin";
 
 export async function GET(request: Request) {
   const id = requestId(request);
@@ -18,7 +19,8 @@ export async function POST(request: Request) {
   const user = await requireApiUser();
   if (!user) return unauthorized(id);
   try {
-    return ok({ generation: await generateForUser(user.id, await request.json()) }, id, { status: 201 });
+    assertSameOriginMutation(request);
+    return ok({ generation: await generateForUser(user.id, await request.json(), requestIp(request), id) }, id, { status: 201 });
   } catch (error) {
     return apiError(error, id);
   }

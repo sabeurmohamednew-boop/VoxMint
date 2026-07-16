@@ -3,9 +3,12 @@ import type { GenerationDto, VoiceDto } from "@/lib/types/dto";
 
 type VoiceWithGenerationCount = Voice & {
   _count?: { generations: number };
+  generations?: Generation[];
 };
 
-export function voiceDto(voice: VoiceWithGenerationCount): VoiceDto {
+export function voiceDto(voice: VoiceWithGenerationCount, latestAudioAvailable = true): VoiceDto {
+  const metadata = voice.providerMetadata && typeof voice.providerMetadata === "object" && !Array.isArray(voice.providerMetadata) ? voice.providerMetadata : null;
+  const latest = voice.generations?.[0];
   return {
     id: voice.id,
     provider: voice.provider,
@@ -17,6 +20,8 @@ export function voiceDto(voice: VoiceWithGenerationCount): VoiceDto {
     lastUsedAt: voice.lastUsedAt?.toISOString() ?? null,
     sourceDurationMs: voice.sourceDurationMs,
     generationCount: voice._count?.generations ?? 0,
+    reconciliationState: metadata?.reconciliationState === "provider_missing" ? "provider_missing" : null,
+    latestGeneration: latest ? generationDto({ ...latest, voice: { name: voice.name } }, latestAudioAvailable) : null,
   };
 }
 

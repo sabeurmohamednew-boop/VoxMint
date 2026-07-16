@@ -1,6 +1,17 @@
-import { apiError, requestId, unauthorized } from "@/lib/api/response";
+import { apiError, ok, requestId, unauthorized } from "@/lib/api/response";
 import { requireApiUser } from "@/lib/auth/session";
-import { deleteGenerationForUser, renameGenerationForUser } from "@/server/services/generation-service";
+import { deleteGenerationForUser, getGenerationForUser, renameGenerationForUser } from "@/server/services/generation-service";
+import { assertSameOriginMutation } from "@/lib/security/request-origin";
+
+export async function GET(request: Request, context: RouteContext<"/api/generations/[generationId]">) {
+  const id = requestId(request);
+  const user = await requireApiUser();
+  if (!user) return unauthorized(id);
+  try {
+    const { generationId } = await context.params;
+    return ok({ generation: await getGenerationForUser(user.id, generationId) }, id);
+  } catch (error) { return apiError(error, id); }
+}
 
 export async function PATCH(
   request: Request,
@@ -10,6 +21,7 @@ export async function PATCH(
   const user = await requireApiUser();
   if (!user) return unauthorized(id);
   try {
+    assertSameOriginMutation(request);
     const { generationId } = await context.params;
     const body = (await request.json()) as { title?: unknown };
     const generation = await renameGenerationForUser(user.id, generationId, body.title);
@@ -27,6 +39,7 @@ export async function DELETE(
   const user = await requireApiUser();
   if (!user) return unauthorized(id);
   try {
+    assertSameOriginMutation(request);
     const { generationId } = await context.params;
     await deleteGenerationForUser(user.id, generationId);
     return new Response(null, { status: 204, headers: { "x-request-id": id } });
