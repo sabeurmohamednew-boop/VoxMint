@@ -1,0 +1,3 @@
+"use client";
+import { CircleAlert } from "lucide-react";
+export default function ErrorPage({ unstable_retry }: { error: Error & { digest?: string }; unstable_retry: () => void }) { return <main className="grid min-h-screen place-items-center p-6 text-center"><div className="panel max-w-md p-8"><CircleAlert className="mx-auto h-9 w-9 text-[var(--danger)]" /><h1 className="mt-4 text-xl font-semibold">Something went wrong</h1><p className="mt-2 text-sm leading-6 text-[var(--foreground-secondary)]">The page could not be loaded. Your saved data has not been changed.</p><button type="button" className="button-primary mt-5 px-5" onClick={unstable_retry}>Try again</button></div></main>; }

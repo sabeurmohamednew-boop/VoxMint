@@ -1,0 +1,1 @@
+export default function AppLoading() { return <div aria-label="Loading page" className="space-y-5"><div className="skeleton h-10 w-52 rounded-lg" /><div className="grid gap-5 lg:grid-cols-2"><div className="skeleton h-[560px] rounded-[14px]" /><div className="skeleton h-[560px] rounded-[14px]" /></div></div>; }
