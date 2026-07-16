@@ -5,6 +5,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../app/generated/prisma/client";
+import { shouldSeedDemoVoices } from "../lib/providers/compatibility";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is required to seed VoxMint.");
@@ -35,7 +36,7 @@ async function main() {
     create: { email: demoEmail, name: "Maya Chen", emailVerified: new Date(), theme: "DARK", plan: "PRO" },
   });
 
-  if ((process.env.VOICE_PROVIDER ?? "mock") !== "mock") {
+  if (!shouldSeedDemoVoices(process.env.VOICE_PROVIDER)) {
     console.info("Demo user seeded; mock voice records skipped because VOICE_PROVIDER is not mock.");
     return;
   }

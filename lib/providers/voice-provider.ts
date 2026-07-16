@@ -1,3 +1,5 @@
+export type VoiceProviderName = "mock" | "cartesia";
+
 export type ProviderCapabilities = {
   instantClone: boolean;
   deletion: boolean;
@@ -39,7 +41,7 @@ export type SynthesizeResult = {
 };
 
 export interface VoiceProvider {
-  readonly name: string;
+  readonly name: VoiceProviderName;
   readonly capabilities: ProviderCapabilities;
   cloneVoice(input: CloneVoiceInput): Promise<CloneVoiceResult>;
   synthesize(input: SynthesizeInput): Promise<SynthesizeResult>;

@@ -9,6 +9,7 @@ import { validateGeneratedAudio } from "@/lib/audio/validation";
 import { getEnv } from "@/lib/config/env";
 import { prisma } from "@/lib/db/prisma";
 import { ProviderError } from "@/lib/providers/errors";
+import { isVoiceCompatibleWithProvider } from "@/lib/providers/compatibility";
 import { getVoiceProvider } from "@/lib/providers";
 import { getRateLimiter, rateLimits } from "@/lib/rate-limit/rate-limiter";
 import { getObjectStorage } from "@/lib/storage";
@@ -53,12 +54,18 @@ export async function generateForUser(userId: string, unknownInput: unknown): Pr
   });
   if (!voice) throw new AppError("VOICE_NOT_FOUND", "Voice not found.", 404);
   if (voice.status !== "READY") throw new AppError("VOICE_NOT_READY", "This voice is not ready yet.", 409);
+  const provider = getVoiceProvider();
+  if (!isVoiceCompatibleWithProvider(voice.provider, provider.name)) {
+    const message =
+      voice.provider === "mock" && provider.name === "cartesia"
+        ? "This demo voice is unavailable while Cartesia is active. Choose a Cartesia voice."
+        : `This voice belongs to a different provider. Choose a ${provider.name} voice.`;
+    throw new AppError("VOICE_PROVIDER_MISMATCH", message, 409);
+  }
 
   const characterCount = Array.from(input.text).length;
   const textHash = createHash("sha256").update(input.text).digest("hex");
   const periodKey = currentPeriodKey();
-  const provider = getVoiceProvider();
-
   const pending = await prisma.$transaction(
     async (transaction) => {
       const user = await transaction.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } });

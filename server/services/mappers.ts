@@ -4,6 +4,7 @@ import type { GenerationDto, VoiceDto } from "@/lib/types/dto";
 export function voiceDto(voice: Voice): VoiceDto {
   return {
     id: voice.id,
+    provider: voice.provider,
     name: voice.name,
     description: voice.description,
     primaryLanguage: voice.primaryLanguage,

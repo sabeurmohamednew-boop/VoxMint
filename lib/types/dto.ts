@@ -1,5 +1,6 @@
 export type VoiceDto = {
   id: string;
+  provider: string;
   name: string;
   description: string | null;
   primaryLanguage: string;
@@ -8,6 +9,16 @@ export type VoiceDto = {
   lastUsedAt: string | null;
   sourceDurationMs: number;
   selected?: boolean;
+};
+
+export type ProviderInfoDto = {
+  name: "mock" | "cartesia";
+  label: "Demo Provider" | "Cartesia";
+  isDemo: boolean;
+  capabilities: {
+    instantClone: boolean;
+    multilingual: boolean;
+  };
 };
 
 export type GenerationDto = {

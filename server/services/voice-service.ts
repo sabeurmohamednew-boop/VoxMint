@@ -3,6 +3,7 @@ import "server-only";
 import { AppError } from "@/lib/api/response";
 import type { ValidatedAudio } from "@/lib/audio/validation";
 import { prisma } from "@/lib/db/prisma";
+import { isVoiceCompatibleWithProvider } from "@/lib/providers/compatibility";
 import { ProviderError } from "@/lib/providers/errors";
 import { getVoiceProvider } from "@/lib/providers";
 import { getRateLimiter, rateLimits } from "@/lib/rate-limit/rate-limiter";
@@ -33,15 +34,20 @@ export async function cloneVoiceForUser(input: {
   userAgentHash?: string;
 }): Promise<VoiceDto> {
   await getRateLimiter().consume(`clone:${input.userId}`, rateLimits.clone);
+  const provider = getVoiceProvider();
   const user = await prisma.user.findUniqueOrThrow({ where: { id: input.userId }, select: { plan: true } });
   const activeVoices = await prisma.voice.count({
-    where: { userId: input.userId, deletedAt: null, status: { in: ["PROCESSING", "READY"] } },
+    where: {
+      userId: input.userId,
+      provider: provider.name,
+      deletedAt: null,
+      status: { in: ["PROCESSING", "READY"] },
+    },
   });
   if (activeVoices >= planLimits[user.plan].voices) {
     throw new AppError("VOICE_QUOTA_EXCEEDED", "You have reached your saved voice limit.", 403);
   }
 
-  const provider = getVoiceProvider();
   if (!provider.capabilities.cloneLanguages.includes(input.language)) {
     throw new AppError("UNSUPPORTED_LANGUAGE", "This language is not supported for voice creation.", 422);
   }
@@ -108,7 +114,11 @@ export async function updateVoiceForUser(userId: string, voiceId: string, unknow
   const voice = await prisma.voice.findFirst({ where: { id: voiceId, userId, deletedAt: null } });
   if (!voice) throw new AppError("VOICE_NOT_FOUND", "Voice not found.", 404);
   const provider = getVoiceProvider();
-  if (provider.updateVoice && provider.capabilities.rename) {
+  if (
+    isVoiceCompatibleWithProvider(voice.provider, provider.name) &&
+    provider.updateVoice &&
+    provider.capabilities.rename
+  ) {
     try {
       await provider.updateVoice(voice.providerVoiceId, {
         name: input.name,
@@ -132,9 +142,13 @@ export async function deleteVoiceForUser(userId: string, voiceId: string): Promi
   const voice = await prisma.voice.findFirst({ where: { id: voiceId, userId, deletedAt: null } });
   if (!voice || voice.status === "DELETED") return;
   await prisma.voice.update({ where: { id: voice.id }, data: { status: "DELETING" } });
+  const provider = getVoiceProvider();
   try {
-    if (getVoiceProvider().capabilities.deletion) {
-      await getVoiceProvider().deleteVoice(voice.providerVoiceId);
+    if (
+      isVoiceCompatibleWithProvider(voice.provider, provider.name) &&
+      provider.capabilities.deletion
+    ) {
+      await provider.deleteVoice(voice.providerVoiceId);
     }
   } catch (error) {
     if (error instanceof ProviderError) throw new AppError("DELETE_PENDING", "Voice deletion is pending. Try again.", 502);

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/db/prisma";
+import { getVoiceProvider } from "@/lib/providers";
 import type { UsageDto } from "@/lib/types/dto";
 
 export const planLimits = {
@@ -14,10 +15,18 @@ export function currentPeriodKey(date = new Date()): string {
 
 export async function getUsage(userId: string): Promise<UsageDto> {
   const periodKey = currentPeriodKey();
+  const provider = getVoiceProvider();
   const [user, usage, voicesUsed] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
     prisma.monthlyUsage.findUnique({ where: { userId_periodKey: { userId, periodKey } } }),
-    prisma.voice.count({ where: { userId, deletedAt: null, status: { not: "DELETED" } } }),
+    prisma.voice.count({
+      where: {
+        userId,
+        provider: provider.name,
+        deletedAt: null,
+        status: { not: "DELETED" },
+      },
+    }),
   ]);
   const limits = planLimits[user.plan];
   return {
