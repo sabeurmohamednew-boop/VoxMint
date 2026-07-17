@@ -1,10 +1,12 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-
-function wavBuffer(durationMs = 4_000): Buffer {
-  const sampleRate = 8_000; const samples = Math.floor(durationMs / 1000 * sampleRate); const dataSize = samples * 2; const buffer = Buffer.alloc(44 + dataSize);
-  buffer.write("RIFF", 0); buffer.writeUInt32LE(36 + dataSize, 4); buffer.write("WAVE", 8); buffer.write("fmt ", 12); buffer.writeUInt32LE(16, 16); buffer.writeUInt16LE(1, 20); buffer.writeUInt16LE(1, 22); buffer.writeUInt32LE(sampleRate, 24); buffer.writeUInt32LE(sampleRate * 2, 28); buffer.writeUInt16LE(2, 32); buffer.writeUInt16LE(16, 34); buffer.write("data", 36); buffer.writeUInt32LE(dataSize, 40); return buffer;
-}
+import {
+  fillVoiceCreationForm,
+  generateTestVoiceover,
+  openVoiceCreationForm,
+  signInAsTestUser,
+  submitVoiceCreation,
+} from "./test-helpers";
 
 async function assertAccessible(page: import("@playwright/test").Page, path: string) {
   await page.goto(path);
@@ -17,41 +19,45 @@ test("public pages have no serious automated accessibility violations", async ({
 });
 
 test("authenticated workspace pages have no serious automated accessibility violations", async ({ page }) => {
-  await page.goto("/login");
-  await page.getByRole("button", { name: "Sign in as Test User A" }).click();
-  for (const path of ["/dashboard", "/voices", "/history", "/settings", "/usage", "/status"]) await assertAccessible(page, path);
+  await signInAsTestUser(page, "A");
+  for (const path of ["/dashboard", "/voices", "/history?provider=mock", "/settings", "/usage", "/status"]) await assertAccessible(page, path);
 });
 
 test("core controls, menus, and dialogs remain keyboard reachable", async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 844 });
-  await page.goto("/login");
-  await page.getByRole("button", { name: "Sign in as Test User A" }).click();
-  await page.goto("/dashboard");
+  await signInAsTestUser(page, "A");
   const navigationTrigger = page.getByRole("button", { name: "Open navigation" });
   await navigationTrigger.focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog", { name: "Navigation" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(navigationTrigger).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(page.getByRole("dialog", { name: "Navigation" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(navigationTrigger).toBeFocused();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 
-  await page.goto("/voices/new");
-  const upload = page.locator('input[type="file"]');
-  await upload.focus();
-  await expect(upload).toBeFocused();
-  await upload.setInputFiles({ name: "keyboard.wav", mimeType: "audio/wav", buffer: wavBuffer() });
-  await page.getByLabel("Voice name").fill("Keyboard Voice");
-  await page.getByRole("checkbox").check();
-  await page.getByRole("button", { name: "Clone Voice" }).click();
+  const voicePanel = await openVoiceCreationForm(page);
+  const uploadZone = voicePanel.getByRole("button", { name: "Choose or drop an audio sample" });
+  await uploadZone.focus();
+  await expect(uploadZone).toBeFocused();
+  const chooserPromise = page.waitForEvent("filechooser");
+  await uploadZone.press("Enter");
+  const chooser = await chooserPromise;
+  expect(chooser.isMultiple()).toBe(false);
+  const cloneButton = await fillVoiceCreationForm(page, {
+    name: "Keyboard Voice",
+    fileName: "keyboard.wav",
+  });
+  await submitVoiceCreation(page, cloneButton, "Keyboard Voice");
 
   const voiceSelector = page.getByRole("combobox", { name: "Select voice" });
   await voiceSelector.focus();
   await expect(voiceSelector).toBeFocused();
-  await page.getByLabel("Enter text").fill("Keyboard accessible generation.");
-  const generate = page.getByRole("button", { name: "Generate Voiceover" });
-  await generate.focus();
-  await expect(generate).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(page.getByText("Voiceover generated")).toBeVisible();
+  await generateTestVoiceover(page, "Keyboard accessible generation.", {
+    activation: "keyboard",
+  });
   const play = page.getByRole("button", { name: "Play audio" });
   await play.focus();
   await expect(play).toBeFocused();
@@ -75,5 +81,6 @@ test("core controls, menus, and dialogs remain keyboard reachable", async ({ pag
   await page.getByRole("button", { name: "Actions for Keyboard Voice" }).click();
   await page.getByRole("menuitem", { name: "Delete" }).click();
   await page.getByRole("button", { name: "Delete voice" }).click();
-  await expect(page.getByText("Voice deleted")).toBeVisible();
+  const notifications = page.getByRole("region", { name: "Notifications (F8)" });
+  await expect(notifications.getByRole("listitem").getByText("Voice deleted", { exact: true })).toBeVisible();
 });

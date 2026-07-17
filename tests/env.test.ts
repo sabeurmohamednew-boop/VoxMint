@@ -139,8 +139,10 @@ describe("authentication configuration", () => {
 
   it("allows test auth only in the test environment", () => {
     expect(issuePaths({ ...localEnv, E2E_TEST_AUTH: "true" })).toContain("E2E_TEST_AUTH");
-    expect(() => parseEnv({ ...localEnv, NODE_ENV: "test", DEV_BYPASS_AUTH: "false", E2E_TEST_AUTH: "true" })).not.toThrow();
+    expect(issuePaths({ ...localEnv, E2E_GENERATIONS_PER_MINUTE: "3" })).toContain("E2E_GENERATIONS_PER_MINUTE");
+    expect(parseEnv({ ...localEnv, NODE_ENV: "test", DEV_BYPASS_AUTH: "false", E2E_TEST_AUTH: "true", E2E_GENERATIONS_PER_MINUTE: "3" }).E2E_GENERATIONS_PER_MINUTE).toBe(3);
     expect(issuePaths({ ...productionEnv, E2E_TEST_AUTH: "true" })).toContain("E2E_TEST_AUTH");
+    expect(issuePaths({ ...productionEnv, E2E_GENERATIONS_PER_MINUTE: "3" })).toContain("E2E_GENERATIONS_PER_MINUTE");
   });
 
   it("requires real launch contacts when public launch is declared", () => {

@@ -118,12 +118,30 @@ export async function consumeOperationLimits(
   operation: "clone" | "generate" | "download",
   userId: string,
   ip: string,
+  options: { e2eGenerationLimit?: number } = {},
 ): Promise<void> {
+  const env = getEnv();
+  const e2eGenerationLimit = options.e2eGenerationLimit;
+  if (
+    e2eGenerationLimit !== undefined &&
+    (
+      operation !== "generate" ||
+      env.NODE_ENV !== "test" ||
+      !env.E2E_TEST_AUTH ||
+      env.E2E_GENERATIONS_PER_MINUTE !== e2eGenerationLimit
+    )
+  ) {
+    throw new Error("The E2E generation rate-limit override is unavailable.");
+  }
   const limiter = getRateLimiter();
-  const rule = configuredRateLimits()[operation];
+  const configuredRule = configuredRateLimits()[operation];
+  const rule = e2eGenerationLimit === undefined
+    ? configuredRule
+    : { ...configuredRule, limit: e2eGenerationLimit };
+  const keyPrefix = e2eGenerationLimit === undefined ? operation : `${operation}:e2e-probe`;
   await Promise.all([
-    limiter.consume(`${operation}:user:${safeRateLimitIdentifier(userId)}`, rule),
-    limiter.consume(`${operation}:ip:${safeRateLimitIdentifier(ip)}`, rule),
+    limiter.consume(`${keyPrefix}:user:${safeRateLimitIdentifier(userId)}`, rule),
+    limiter.consume(`${keyPrefix}:ip:${safeRateLimitIdentifier(ip)}`, rule),
   ]);
 }
 

@@ -1,32 +1,32 @@
 import { expect, test } from "@playwright/test";
+import {
+  createTestVoice,
+  generateTestVoiceover,
+  signInAsTestUser,
+} from "./test-helpers";
 
-async function signIn(page: import("@playwright/test").Page, user: "A" | "B" = "A") {
-  await page.goto("/login");
-  await page.getByRole("button", { name: `Sign in as Test User ${user}` }).click();
-  await expect(page).toHaveURL(/dashboard/);
+function serviceStatusCeilingCard(page: import("@playwright/test").Page) {
+  const main = page.getByRole("main");
+  return main.locator("section").filter({
+    has: page.getByRole("heading", { name: "Demo Provider configured ceiling" }),
+  });
 }
 
-function wavBuffer(durationMs = 4_000): Buffer {
-  const sampleRate = 8_000; const sampleCount = Math.floor((durationMs / 1000) * sampleRate); const dataSize = sampleCount * 2; const buffer = Buffer.alloc(44 + dataSize);
-  buffer.write("RIFF", 0); buffer.writeUInt32LE(36 + dataSize, 4); buffer.write("WAVE", 8); buffer.write("fmt ", 12); buffer.writeUInt32LE(16, 16); buffer.writeUInt16LE(1, 20); buffer.writeUInt16LE(1, 22); buffer.writeUInt32LE(sampleRate, 24); buffer.writeUInt32LE(sampleRate * 2, 28); buffer.writeUInt16LE(2, 32); buffer.writeUInt16LE(16, 34); buffer.write("data", 36); buffer.writeUInt32LE(dataSize, 40); return buffer;
+function notification(page: import("@playwright/test").Page, message: string) {
+  return page
+    .getByRole("region", { name: "Notifications (F8)" })
+    .getByRole("listitem")
+    .getByText(message, { exact: true });
 }
 
 test("permitted voice creation and generation workflow", async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 844 });
-  await signIn(page);
-  await page.goto("/voices/new");
-  await page.locator('input[type="file"]').setInputFiles({ name: "owned-voice.wav", mimeType: "audio/wav", buffer: wavBuffer() });
+  await signInAsTestUser(page);
   const voiceName = `E2E Voice ${Date.now()}`;
-  await page.getByLabel("Voice name").fill(voiceName);
-  await page.getByRole("checkbox").check();
-  await page.getByRole("button", { name: "Clone Voice" }).click();
-  await expect(page.getByText("Voice created")).toBeVisible();
-  await expect(page).toHaveURL(/dashboard\?voice=.+#generate/);
-  await expect(page.getByRole("combobox", { name: "Select voice" })).toContainText(voiceName);
-  await page.getByLabel("Enter text").fill("This is a VoxMint end to end test.");
-  await page.getByRole("button", { name: "Generate Voiceover" }).click();
-  await expect(page.getByText("Voiceover generated")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Download/ }).first()).toBeVisible();
+  await createTestVoice(page, { name: voiceName, fileName: "owned-voice.wav" });
+  await generateTestVoiceover(page, "This is a VoxMint end to end test.");
+  const downloadButton = page.getByRole("button", { name: "Download audio" });
+  await expect(downloadButton).toBeVisible();
   const audioUrl = await page.locator("audio").getAttribute("src");
   expect(audioUrl).toBeTruthy();
   const audioChecks = await page.evaluate(async (url) => {
@@ -47,7 +47,7 @@ test("permitted voice creation and generation workflow", async ({ page }) => {
   expect(audioChecks.contentRange).toMatch(/^bytes 0-15\//);
   expect(audioChecks.rangeBytes).toHaveLength(16);
   const downloadEvent = page.waitForEvent("download");
-  await page.getByRole("button", { name: /Download/ }).first().click();
+  await downloadButton.click();
   const download = await downloadEvent;
   expect(download.suggestedFilename()).toMatch(/\.wav$/);
 
@@ -57,30 +57,40 @@ test("permitted voice creation and generation workflow", async ({ page }) => {
   await page.getByLabel("Voice name").fill(`${voiceName} Renamed`);
   await page.getByLabel("Description").fill("E2E description for distinguishing this voice.");
   await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.getByText("Voice updated")).toBeVisible();
+  await expect(notification(page, "Voice updated")).toBeVisible();
   await expect(page.getByText("E2E description for distinguishing this voice.")).toBeVisible();
 
   await page.goto("/history");
   await expect(page).toHaveURL(/provider=mock/);
-  await expect(page.getByText(/end to end test/i)).toBeVisible();
-  await page.getByRole("button", { name: /View details/ }).first().click();
-  await expect(page.getByRole("heading", { name: /This is a VoxMint end to end test/i })).toBeVisible();
-  await expect(page.getByText(/E2E Voice .* Renamed/).first()).toBeVisible();
-  await page.getByRole("button", { name: /Delete This is a VoxMint end to end test/i }).first().click();
+  const generationTitle = "This is a VoxMint end to end test.";
+  const historyItem = page.getByRole("article").filter({
+    has: page.getByRole("heading", { name: generationTitle, exact: true }),
+  });
+  await expect(historyItem).toHaveCount(1);
+  await expect(historyItem.getByRole("heading", { name: generationTitle, exact: true })).toBeVisible();
+  await historyItem.getByRole("button", { name: `View details for ${generationTitle}` }).click();
+  const details = page.locator('section[aria-labelledby="history-details-title"]');
+  await expect(details.getByRole("heading", { name: generationTitle, exact: true })).toBeVisible();
+  await expect(details.getByText(new RegExp(`E2E Voice .* Renamed`))).toBeVisible();
+  await historyItem.getByRole("button", { name: `Delete ${generationTitle}` }).click();
   await page.getByRole("button", { name: "Delete audio and record" }).click();
-  await expect(page.getByText("Stored audio and history record deleted")).toBeVisible();
+  await expect(notification(page, "Stored audio and history record deleted")).toBeVisible();
 
   await page.goto("/voices");
   await page.getByRole("button", { name: new RegExp(`Actions for ${voiceName} Renamed`) }).click();
   await page.getByRole("menuitem", { name: "Delete" }).click();
   await page.getByRole("button", { name: "Delete voice" }).click();
-  await expect(page.getByText("Voice deleted")).toBeVisible();
+  await expect(notification(page, "Voice deleted")).toBeVisible();
 
   await page.goto("/settings");
-  await page.getByLabel("Display name").fill("Playwright User A");
-  await page.getByLabel("Theme").selectOption("LIGHT");
-  await page.getByRole("button", { name: "Save settings" }).click();
-  await expect(page.getByText("Settings saved")).toBeVisible();
+  const preferences = page.getByRole("main").locator("section").filter({
+    has: page.getByRole("heading", { name: "Profile & preferences" }),
+  });
+  await expect(preferences).toHaveCount(1);
+  await preferences.getByLabel("Display name").fill("Playwright User A");
+  await preferences.getByLabel("Theme").selectOption("LIGHT");
+  await preferences.getByRole("button", { name: "Save settings" }).click();
+  await expect(notification(page, "Settings saved")).toBeVisible();
   await page.reload();
   await expect(page.locator("html")).toHaveClass(/light/);
   await page.getByRole("button", { name: "Sign out" }).click();
@@ -89,10 +99,15 @@ test("permitted voice creation and generation workflow", async ({ page }) => {
 });
 
 test("product semantics remain honest in development", async ({ page }) => {
-  await signIn(page);
+  await signInAsTestUser(page);
   await page.goto("/status");
-  await expect(page.getByText("Billing unavailable").first()).toBeVisible();
-  await expect(page.getByText("Payments unavailable").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Service status" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Billing unavailable" })).toBeVisible();
+  const ceilingCard = serviceStatusCeilingCard(page);
+  await expect(ceilingCard).toHaveCount(1);
+  await expect(ceilingCard.getByText("Configured deployment ceiling", { exact: true })).toBeVisible();
+  await expect(ceilingCard.getByRole("heading", { name: "Demo Provider configured ceiling" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Payments unavailable" })).toBeVisible();
   await expect(page.getByText(/VoxMint Pro/i)).toHaveCount(0);
   await page.goto("/settings");
   await expect(page.getByLabel(/Retention preference/i).first()).toBeDisabled();
@@ -106,7 +121,7 @@ test("read-only product and responsive browser review", async ({ page }) => {
   page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await signIn(page);
+  await signInAsTestUser(page);
   await expect(page.getByRole("main").getByRole("heading", { name: "Generate Voiceover" })).toBeVisible();
   await expect(page.getByRole("main").getByRole("heading", { name: /Clone a Voice|Generate Voiceover/ }).first()).toBeVisible();
 
@@ -122,9 +137,13 @@ test("read-only product and responsive browser review", async ({ page }) => {
   await expect(page).toHaveURL(/provider=mock/);
 
   await page.goto("/status");
-  await expect(page.getByText("Billing unavailable").first()).toBeVisible();
-  await expect(page.getByText("Demo allowance").first()).toBeVisible();
-  await expect(page.getByText("Payments unavailable").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Service status" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Billing unavailable" })).toBeVisible();
+  const ceilingCard = serviceStatusCeilingCard(page);
+  await expect(ceilingCard).toHaveCount(1);
+  await expect(ceilingCard.getByText("Configured deployment ceiling", { exact: true })).toBeVisible();
+  await expect(ceilingCard.getByRole("heading", { name: "Demo Provider configured ceiling" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Payments unavailable" })).toBeVisible();
   await expect(page.getByText(/VoxMint Pro/i)).toHaveCount(0);
 
   await page.goto("/settings");

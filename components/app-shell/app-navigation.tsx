@@ -63,12 +63,24 @@ export function MobileNavigation({ title, right }: { title: string; right: React
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
+  const restoreFocusRef = useRef(false);
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
-    if (open) window.requestAnimationFrame(() => dialogRef.current?.querySelector<HTMLButtonElement>("button")?.focus());
-    return () => { document.body.style.overflow = ""; };
+    const frame = window.requestAnimationFrame(() => {
+      if (open) {
+        restoreFocusRef.current = true;
+        dialogRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+      } else if (restoreFocusRef.current) {
+        triggerRef.current?.focus();
+        restoreFocusRef.current = false;
+      }
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.body.style.overflow = "";
+    };
   }, [open]);
-  function close() { setOpen(false); window.requestAnimationFrame(() => triggerRef.current?.focus()); }
+  function close() { setOpen(false); }
   function trapKeyboard(event: React.KeyboardEvent) {
     if (event.key === "Escape") { event.preventDefault(); close(); return; }
     if (event.key !== "Tab" || !dialogRef.current) return;

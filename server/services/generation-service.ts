@@ -76,7 +76,7 @@ export function parseGenerationTestFailureMode(value: string | null): Generation
     : null;
 }
 
-export async function generateForUser(userId: string, unknownInput: unknown, requestIp = "unknown", requestId?: string, testFailureMode: GenerationTestFailureMode | null = null): Promise<GenerationDto> {
+export async function generateForUser(userId: string, unknownInput: unknown, requestIp = "unknown", requestId?: string, testFailureMode: GenerationTestFailureMode | null = null, testGenerationRateLimit?: number): Promise<GenerationDto> {
   const startedAt = Date.now();
   const env = getEnv();
   const input = generationSchema(env.GENERATION_MAX_CHARACTERS).parse(unknownInput);
@@ -87,7 +87,9 @@ export async function generateForUser(userId: string, unknownInput: unknown, req
   });
   if (existing) return generationDto(existing);
   assertVoiceOperationsEnabled();
-  await consumeOperationLimits("generate", userId, requestIp);
+  await consumeOperationLimits("generate", userId, requestIp, {
+    e2eGenerationLimit: testGenerationRateLimit,
+  });
 
   const voice = await requireOwnedVoice(userId, input.voiceId);
   if (voice.status !== "READY") throw new AppError("VOICE_NOT_READY", "This voice is not ready yet.", 409);

@@ -27,6 +27,11 @@ const enabledBooleanString = z
 const positiveInteger = (fallback: number) =>
   z.coerce.number().int().positive().default(fallback);
 
+const optionalPositiveInteger = z.preprocess(
+  emptyStringToUndefined,
+  z.coerce.number().int().positive().optional(),
+);
+
 export const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -55,6 +60,7 @@ export const envSchema = z
     UPSTASH_REDIS_REST_TOKEN: optionalEnvString(),
     DEV_BYPASS_AUTH: booleanString,
     E2E_TEST_AUTH: booleanString,
+    E2E_GENERATIONS_PER_MINUTE: optionalPositiveInteger,
     NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
     VOICE_SAMPLE_MIN_SECONDS: positiveInteger(3),
     VOICE_SAMPLE_MAX_SECONDS: positiveInteger(10),
@@ -83,6 +89,13 @@ export const envSchema = z
   .superRefine((env, context) => {
     if (env.E2E_TEST_AUTH && env.NODE_ENV !== "test") {
       context.addIssue({ code: "custom", path: ["E2E_TEST_AUTH"], message: "E2E_TEST_AUTH is allowed only when NODE_ENV=test." });
+    }
+    if (env.E2E_GENERATIONS_PER_MINUTE !== undefined && (env.NODE_ENV !== "test" || !env.E2E_TEST_AUTH)) {
+      context.addIssue({
+        code: "custom",
+        path: ["E2E_GENERATIONS_PER_MINUTE"],
+        message: "The E2E generation limit requires test mode and E2E_TEST_AUTH.",
+      });
     }
     if (env.VOICE_SAMPLE_MIN_SECONDS >= env.VOICE_SAMPLE_MAX_SECONDS) {
       context.addIssue({

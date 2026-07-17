@@ -12,6 +12,7 @@ export function ConfirmDialog({
   onConfirm,
   danger = false,
   confirmationPhrase,
+  returnFocus,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -21,6 +22,7 @@ export function ConfirmDialog({
   onConfirm: () => void | Promise<void>;
   danger?: boolean;
   confirmationPhrase?: string;
+  returnFocus?: () => HTMLElement | null;
 }) {
   const [confirmation, setConfirmation] = useState("");
   const confirmed = !confirmationPhrase || confirmation === confirmationPhrase;
@@ -28,7 +30,15 @@ export function ConfirmDialog({
     <AlertDialog.Root open={open} onOpenChange={(next) => { if (!next) setConfirmation(""); onOpenChange(next); }}>
       <AlertDialog.Portal>
         <AlertDialog.Overlay className="dialog-overlay" />
-        <AlertDialog.Content className="dialog-content">
+        <AlertDialog.Content
+          className="dialog-content"
+          onCloseAutoFocus={(event) => {
+            const target = returnFocus?.();
+            if (!target || !document.contains(target)) return;
+            event.preventDefault();
+            target.focus();
+          }}
+        >
           <AlertDialog.Title className="text-lg font-semibold">{title}</AlertDialog.Title>
           <AlertDialog.Description className="mt-2 text-sm leading-6 text-[var(--foreground-secondary)]">{description}</AlertDialog.Description>
           {confirmationPhrase && <label className="mt-4 block text-xs font-semibold">Type <span className="font-mono text-[var(--danger)]">{confirmationPhrase}</span> to continue<input className="field mt-2 px-3" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} autoComplete="off" /></label>}
