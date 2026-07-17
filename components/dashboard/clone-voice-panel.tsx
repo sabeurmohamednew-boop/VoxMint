@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { fetchJson } from "@/lib/api/client";
 import { formatDuration } from "@/lib/audio/utils";
+import { getLanguageOptions, isSupportedLanguage, type SupportedLanguage } from "@/lib/languages";
 import type { VoiceDto } from "@/lib/types/dto";
 import { voiceNameSchema } from "@/lib/validation/schemas";
 import { useToast } from "@/components/ui/toast";
@@ -35,14 +36,22 @@ export function CloneVoicePanel({
   onCreated,
   onboardingStep,
   operationsEnabled = true,
+  preferredLanguage,
+  supportedLanguages,
 }: {
   onCreated: (voice: VoiceDto) => void;
   onboardingStep?: number;
   operationsEnabled?: boolean;
+  preferredLanguage: string;
+  supportedLanguages: readonly SupportedLanguage[];
 }) {
   const [state, dispatch] = useReducer(reducer, { phase: "idle", file: null, error: null });
   const [name, setName] = useState("");
-  const [language, setLanguage] = useState("en");
+  const [language, setLanguage] = useState<SupportedLanguage | "">(() =>
+    isSupportedLanguage(preferredLanguage) && supportedLanguages.includes(preferredLanguage)
+      ? preferredLanguage
+      : supportedLanguages[0] ?? "",
+  );
   const [description, setDescription] = useState("");
   const [showDescription, setShowDescription] = useState(false);
   const [consent, setConsent] = useState(false);
@@ -52,12 +61,13 @@ export function CloneVoicePanel({
   const idempotencyKey = useRef(crypto.randomUUID());
   const { showToast } = useToast();
   const previewUrl = useMemo(() => (state.file ? URL.createObjectURL(state.file) : null), [state.file]);
+  const languageOptions = useMemo(() => getLanguageOptions(supportedLanguages), [supportedLanguages]);
 
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
 
   const nameValid = voiceNameSchema.safeParse(name).success;
   const busy = ["client-validating", "uploading", "cloning", "saving"].includes(state.phase);
-  const canSubmit = Boolean(operationsEnabled && state.file && nameValid && consent && !busy);
+  const canSubmit = Boolean(operationsEnabled && language && state.file && nameValid && consent && !busy);
 
   function selectFile(file: File | undefined) {
     if (!file) return;
@@ -68,7 +78,7 @@ export function CloneVoicePanel({
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!state.file || !canSubmit) return;
+    if (!state.file || !language || !canSubmit) return;
     dispatch({ type: "phase", phase: "client-validating" });
     const data = new FormData();
     data.set("sample", state.file);
@@ -145,7 +155,7 @@ export function CloneVoicePanel({
         )}
 
         <div><label htmlFor="voice-name" className="text-[13px] font-semibold">Voice name</label><input id="voice-name" className="field mt-2 px-3" value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Studio Narration" maxLength={50} aria-invalid={name.length > 0 && !nameValid} />{name.length > 0 && !nameValid && <p className="mt-1.5 text-xs text-[var(--danger)]">Use 2–50 letters or numbers; spaces, hyphens and apostrophes are allowed.</p>}</div>
-        <div className="grid gap-3 sm:grid-cols-2"><div><label htmlFor="voice-language" className="text-[13px] font-semibold">Primary language</label><select id="voice-language" className="field mt-2 px-3" value={language} onChange={(event) => setLanguage(event.target.value)}><option value="en">English</option><option value="fr">French</option><option value="ar">Arabic</option></select></div><div className="flex items-end">{!showDescription ? <button type="button" className="button-ghost w-full" onClick={() => setShowDescription(true)}><Plus className="h-4 w-4" />Add description</button> : <label className="w-full text-[13px] font-semibold">Description<input className="field mt-2 px-3" value={description} onChange={(event) => setDescription(event.target.value)} maxLength={160} /></label>}</div></div>
+        <div className="grid gap-3 sm:grid-cols-2"><div><label htmlFor="voice-language" className="text-[13px] font-semibold">Primary language</label><select id="voice-language" className="field mt-2 px-3" value={language} disabled={languageOptions.length === 0} onChange={(event) => { if (isSupportedLanguage(event.target.value)) setLanguage(event.target.value); }}>{languageOptions.length ? languageOptions.map((option) => <option key={option.code} value={option.code}>{option.label}</option>) : <option value="">No verified languages available</option>}</select>{languageOptions.length === 0 && <p className="mt-1.5 text-xs text-[var(--warning)]" role="status">Voice creation is unavailable for the configured provider model.</p>}</div><div className="flex items-end">{!showDescription ? <button type="button" className="button-ghost w-full" onClick={() => setShowDescription(true)}><Plus className="h-4 w-4" />Add description</button> : <label className="w-full text-[13px] font-semibold">Description<input className="field mt-2 px-3" value={description} onChange={(event) => setDescription(event.target.value)} maxLength={160} /></label>}</div></div>
         <label className="flex cursor-pointer items-start gap-3 rounded-[9px] border border-[var(--border-subtle)] bg-[var(--panel-muted)] p-3.5"><input className="mt-1 h-4 w-4 accent-[#7447e8]" type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span className="text-[12.5px] leading-5 text-[var(--foreground-secondary)]"><strong className="font-semibold text-[var(--foreground)]">I confirm that I own this voice or have explicit permission from the speaker to clone and use it.</strong><br />Do not upload audio taken from media, calls or private recordings without permission. <Link href="/acceptable-use" className="font-semibold text-[var(--foreground)] underline decoration-[1.5px] underline-offset-2 hover:decoration-2 focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8050eb]">Acceptable Use</Link></span></label>
         {state.error && <p className="rounded-lg border border-[var(--danger)]/30 bg-[var(--danger)]/10 px-3 py-2.5 text-sm text-[#ff9aaa]" role="alert">{state.error}</p>}
         <button className="button-primary w-full" type="submit" disabled={!canSubmit}>{busy ? statusLabel : <><Mic2 className="h-[18px] w-[18px]" />Clone Voice</>}</button>

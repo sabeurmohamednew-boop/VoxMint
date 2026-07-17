@@ -8,7 +8,7 @@ const providerInfo: ProviderInfoDto = {
   isDemo: false,
   showBranding: true,
   operationsEnabled: true,
-  capabilities: { instantClone: true, multilingual: true },
+  capabilities: { instantClone: true, multilingual: true, cloneLanguages: ["en", "fr", "ar", "hi"], generationLanguages: ["en", "fr", "ar", "hi"] },
 };
 
 const usage: UsageDto = {

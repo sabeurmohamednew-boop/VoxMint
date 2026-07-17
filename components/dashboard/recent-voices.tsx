@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
 import { fetchJson } from "@/lib/api/client";
-import { isVoiceCompatibleWithProvider } from "@/lib/providers/compatibility";
+import { isVoiceCompatibleWithProvider, isVoiceLanguageSupported } from "@/lib/providers/compatibility";
 import type { ProviderInfoDto, VoiceDto } from "@/lib/types/dto";
 import { LocalTime } from "@/components/ui/local-time";
 
@@ -30,10 +30,10 @@ export function RecentVoices({
     () =>
       [...voices].sort(
         (first, second) =>
-          Number(isVoiceCompatibleWithProvider(second.provider, providerInfo.name)) -
-          Number(isVoiceCompatibleWithProvider(first.provider, providerInfo.name)),
+          Number(isVoiceCompatibleWithProvider(second.provider, providerInfo.name) && isVoiceLanguageSupported(second.primaryLanguage, providerInfo.capabilities.generationLanguages)) -
+          Number(isVoiceCompatibleWithProvider(first.provider, providerInfo.name) && isVoiceLanguageSupported(first.primaryLanguage, providerInfo.capabilities.generationLanguages)),
       ),
-    [providerInfo.name, voices],
+    [providerInfo.capabilities.generationLanguages, providerInfo.name, voices],
   );
 
   async function confirmDelete() {
@@ -64,7 +64,7 @@ export function RecentVoices({
       {visibleVoices.length ? (
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {visibleVoices.slice(0, 3).map((voice) => {
-            const compatible = isVoiceCompatibleWithProvider(voice.provider, providerInfo.name);
+            const compatible = isVoiceCompatibleWithProvider(voice.provider, providerInfo.name) && isVoiceLanguageSupported(voice.primaryLanguage, providerInfo.capabilities.generationLanguages);
             const usable = compatible && voice.status === "READY";
             return (
               <div

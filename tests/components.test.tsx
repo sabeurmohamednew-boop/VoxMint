@@ -33,7 +33,7 @@ const mockProviderInfo: ProviderInfoDto = {
   isDemo: true,
   showBranding: true,
   operationsEnabled: true,
-  capabilities: { instantClone: true, multilingual: true },
+  capabilities: { instantClone: true, multilingual: true, cloneLanguages: ["en", "fr", "ar", "hi"], generationLanguages: ["en", "fr", "ar", "hi"] },
 };
 
 const cartesiaProviderInfo: ProviderInfoDto = {
@@ -42,7 +42,12 @@ const cartesiaProviderInfo: ProviderInfoDto = {
   isDemo: false,
   showBranding: true,
   operationsEnabled: true,
-  capabilities: { instantClone: true, multilingual: true },
+  capabilities: { instantClone: true, multilingual: true, cloneLanguages: ["en", "fr", "ar", "hi"], generationLanguages: ["en", "fr", "ar", "hi"] },
+};
+
+const englishOnlyProviderInfo: ProviderInfoDto = {
+  ...cartesiaProviderInfo,
+  capabilities: { instantClone: true, multilingual: false, cloneLanguages: ["en"], generationLanguages: ["en"] },
 };
 
 function voice(id: string, provider: string, name: string): VoiceDto {
@@ -65,12 +70,24 @@ beforeEach(() => sessionStorage.clear());
 describe("clone panel", () => {
   it("opens the file picker from the keyboard and keeps consent mandatory", async () => {
     const click = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => undefined);
-    render(<ToastProvider><CloneVoicePanel onCreated={vi.fn()} /></ToastProvider>);
+    render(<ToastProvider><CloneVoicePanel onCreated={vi.fn()} preferredLanguage="en" supportedLanguages={mockProviderInfo.capabilities.cloneLanguages} /></ToastProvider>);
     const dropzone = screen.getByRole("button", { name: /choose or drop/i });
     fireEvent.keyDown(dropzone, { key: "Enter" });
     expect(click).toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Clone Voice" })).toBeDisabled();
     click.mockRestore();
+  });
+
+  it("offers verified Hindi support and honors the saved default language", () => {
+    render(<ToastProvider><CloneVoicePanel onCreated={vi.fn()} preferredLanguage="hi" supportedLanguages={cartesiaProviderInfo.capabilities.cloneLanguages} /></ToastProvider>);
+    expect(screen.getByRole("combobox", { name: "Primary language" })).toHaveValue("hi");
+    expect(screen.getByRole("option", { name: "Hindi" })).toHaveValue("hi");
+  });
+
+  it("does not expose languages absent from the active provider capability", () => {
+    render(<ToastProvider><CloneVoicePanel onCreated={vi.fn()} preferredLanguage="hi" supportedLanguages={englishOnlyProviderInfo.capabilities.cloneLanguages} /></ToastProvider>);
+    expect(screen.getByRole("combobox", { name: "Primary language" })).toHaveValue("en");
+    expect(screen.queryByRole("option", { name: "Hindi" })).not.toBeInTheDocument();
   });
 });
 
@@ -141,14 +158,20 @@ describe("product semantics", () => {
   });
 
   it("keeps scheduled retention visibly inactive and unsavable without a worker", () => {
-    render(<ToastProvider><SettingsClient account={{ name: "Maya", email: "maya@example.test", preferredLanguage: "en", preferredAudioFormat: "wav", theme: "DARK", retentionDays: null }} operations={{ developmentSession: true, retentionWorkerEnabled: false }} /></ToastProvider>);
+    render(<ToastProvider><SettingsClient account={{ name: "Maya", email: "maya@example.test", preferredLanguage: "en", preferredAudioFormat: "wav", theme: "DARK", retentionDays: null }} operations={{ developmentSession: true, retentionWorkerEnabled: false }} providerInfo={mockProviderInfo} /></ToastProvider>);
     expect(screen.getByText("Development account")).toBeInTheDocument();
     expect(screen.getByLabelText(/Retention preference/i)).toBeDisabled();
     expect(screen.getByText(/Scheduled retention is not active in this deployment/i)).toBeInTheDocument();
   });
 
+  it("offers Hindi as the default language", () => {
+    render(<ToastProvider><SettingsClient account={{ name: "Maya", email: "maya@example.test", preferredLanguage: "hi", preferredAudioFormat: "wav", theme: "DARK", retentionDays: null }} operations={{ developmentSession: true, retentionWorkerEnabled: false }} providerInfo={cartesiaProviderInfo} /></ToastProvider>);
+    expect(screen.getByRole("combobox", { name: "Default language" })).toHaveValue("hi");
+    expect(screen.getByRole("option", { name: "Hindi" })).toHaveValue("hi");
+  });
+
   it("enables scheduled retention only when a worker capability is present", () => {
-    render(<ToastProvider><SettingsClient account={{ name: "Maya", email: "maya@example.test", preferredLanguage: "en", preferredAudioFormat: "wav", theme: "DARK", retentionDays: 30 }} operations={{ developmentSession: false, retentionWorkerEnabled: true }} /></ToastProvider>);
+    render(<ToastProvider><SettingsClient account={{ name: "Maya", email: "maya@example.test", preferredLanguage: "en", preferredAudioFormat: "wav", theme: "DARK", retentionDays: 30 }} operations={{ developmentSession: false, retentionWorkerEnabled: true }} providerInfo={cartesiaProviderInfo} /></ToastProvider>);
     expect(screen.getByLabelText(/Retention preference/i)).toBeEnabled();
     expect(screen.getByText(/Scheduled retention is active/i)).toBeInTheDocument();
     expect(screen.queryByText("Development account")).not.toBeInTheDocument();
@@ -178,14 +201,14 @@ describe("product semantics", () => {
   });
 
   it("shows clone-first onboarding without a duplicate clone link", () => {
-    render(<ToastProvider><DashboardClient initialVoices={[]} initialSelectedVoiceId={null} initialGeneration={null} usage={usage} providerInfo={mockProviderInfo} /></ToastProvider>);
+    render(<ToastProvider><DashboardClient initialVoices={[]} initialSelectedVoiceId={null} initialGeneration={null} usage={usage} providerInfo={mockProviderInfo} preferredLanguage="en" /></ToastProvider>);
     expect(screen.getByRole("heading", { name: "Clone a Voice" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Clone Voice" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Clone new voice/i })).not.toBeInTheDocument();
   });
 
   it("shows generation first for returning users with one clone action", () => {
-    render(<ToastProvider><DashboardClient initialVoices={[voice("cartesia-voice", "cartesia", "Mohamed Test Voice")]} initialSelectedVoiceId="cartesia-voice" initialGeneration={null} usage={{ ...usage, activeProvider: "cartesia" }} providerInfo={cartesiaProviderInfo} /></ToastProvider>);
+    render(<ToastProvider><DashboardClient initialVoices={[voice("cartesia-voice", "cartesia", "Mohamed Test Voice")]} initialSelectedVoiceId="cartesia-voice" initialGeneration={null} usage={{ ...usage, activeProvider: "cartesia" }} providerInfo={cartesiaProviderInfo} preferredLanguage="en" /></ToastProvider>);
     expect(screen.getByRole("heading", { name: "Generate Voiceover" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Clone a Voice" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /Clone new voice/i })).toHaveLength(1);

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SUPPORTED_LANGUAGE_CODES } from "@/lib/languages";
 
 const voiceNamePattern = /^(?=.*[\p{L}\p{N}])[\p{L}\p{N}][\p{L}\p{N} '\-]*[\p{L}\p{N}]$/u;
 
@@ -9,7 +10,7 @@ export const voiceNameSchema = z
   .max(50, "Use no more than 50 characters.")
   .regex(voiceNamePattern, "Use letters, numbers, spaces, hyphens, or apostrophes.");
 
-export const languageSchema = z.enum(["en", "fr", "ar"]);
+export const languageSchema = z.enum(SUPPORTED_LANGUAGE_CODES);
 
 export const cloneMetadataSchema = z.object({
   name: voiceNameSchema,

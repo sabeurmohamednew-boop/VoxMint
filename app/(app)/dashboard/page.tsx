@@ -1,6 +1,8 @@
 import { DashboardClient } from "@/components/dashboard/dashboard-client";
 import { requireUser } from "@/lib/auth/session";
 import { getPublicProviderInfo } from "@/lib/providers";
+import { isVoiceLanguageSupported } from "@/lib/providers/compatibility";
+import { getAccount } from "@/server/services/account-service";
 import { listGenerations } from "@/server/services/generation-service";
 import { getUsage } from "@/server/services/usage-service";
 import { listVoices } from "@/server/services/voice-service";
@@ -12,11 +14,11 @@ export default async function DashboardPage({
 }) {
   const user = await requireUser();
   const providerInfo = getPublicProviderInfo();
-  const [voices, generations, usage] = await Promise.all([listVoices(user.id), listGenerations(user.id, 1, providerInfo.name), getUsage(user.id)]);
+  const [voices, generations, usage, account] = await Promise.all([listVoices(user.id), listGenerations(user.id, 1, providerInfo.name), getUsage(user.id), getAccount(user.id)]);
   const params = await searchParams;
   const requestedVoiceId = params.voice;
   const requested = typeof requestedVoiceId === "string" ? requestedVoiceId : null;
-  const usableVoices = voices.filter((voice) => voice.status === "READY" && voice.provider === providerInfo.name);
+  const usableVoices = voices.filter((voice) => voice.status === "READY" && voice.provider === providerInfo.name && isVoiceLanguageSupported(voice.primaryLanguage, providerInfo.capabilities.generationLanguages));
   const initialSelectedVoiceId = usableVoices.some((voice) => voice.id === requested)
     ? requested
     : usableVoices[0]?.id ?? null;
@@ -26,7 +28,7 @@ export default async function DashboardPage({
   return (
     <>
       <header className="mb-6"><h1 className="text-[30px] font-bold tracking-[-0.035em] sm:text-[32px]">VoxMint</h1><p className="mt-1.5 text-[14px] text-[var(--foreground-secondary)]">Create a permitted voice clone and turn scripts into natural speech.</p></header>
-      <DashboardClient initialVoices={voices} initialSelectedVoiceId={initialSelectedVoiceId} initialGeneration={generations[0] ?? null} initialScript={initialScript} usage={usage} providerInfo={providerInfo} />
+      <DashboardClient initialVoices={voices} initialSelectedVoiceId={initialSelectedVoiceId} initialGeneration={generations[0] ?? null} initialScript={initialScript} usage={usage} providerInfo={providerInfo} preferredLanguage={account.preferredLanguage} />
     </>
   );
 }

@@ -13,6 +13,8 @@ export function toPublicProviderInfo(
     capabilities: {
       instantClone: provider.capabilities.instantClone,
       multilingual: provider.capabilities.multilingual,
+      cloneLanguages: [...provider.capabilities.cloneLanguages],
+      generationLanguages: [...provider.capabilities.generationLanguages],
     },
   };
 }

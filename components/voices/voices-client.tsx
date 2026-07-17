@@ -10,7 +10,7 @@ import { AudioPlayer } from "@/components/audio/audio-player";
 import { LocalTime } from "@/components/ui/local-time";
 import { useToast } from "@/components/ui/toast";
 import { fetchJson } from "@/lib/api/client";
-import { isVoiceCompatibleWithProvider } from "@/lib/providers/compatibility";
+import { isVoiceCompatibleWithProvider, isVoiceLanguageSupported } from "@/lib/providers/compatibility";
 import type { ProviderInfoDto, VoiceDto } from "@/lib/types/dto";
 
 export function VoicesClient({
@@ -81,7 +81,9 @@ export function VoicesClient({
       {filtered.length ? (
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((voice) => {
-            const compatible = isVoiceCompatibleWithProvider(voice.provider, providerInfo.name);
+            const providerCompatible = isVoiceCompatibleWithProvider(voice.provider, providerInfo.name);
+            const languageCompatible = isVoiceLanguageSupported(voice.primaryLanguage, providerInfo.capabilities.generationLanguages);
+            const compatible = providerCompatible && languageCompatible;
             const usable = compatible && voice.status === "READY";
             return (
               <article className={`panel flex min-h-[300px] min-w-0 flex-col p-5 ${compatible ? "" : "opacity-75"}`} key={voice.id}>
@@ -90,7 +92,8 @@ export function VoicesClient({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2"><h2 className="min-w-0 break-words text-sm font-semibold" title={voice.name}>{voice.name}</h2><span className={voice.provider === "mock" ? "demo-voice-badge" : "provider-badge"}>{voice.provider === "mock" ? "Demo voice" : "Cartesia"}</span></div>
                     <p className="mt-1 text-xs text-[var(--muted)]">{voice.primaryLanguage.toUpperCase()} · {voice.status === "READY" ? "Ready" : voice.status.toLowerCase()}</p>
-                    {!compatible && <p className="mt-1 text-[11px] text-[var(--warning)]">Unavailable while {providerInfo.label} is active</p>}
+                    {!providerCompatible && <p className="mt-1 text-[11px] text-[var(--warning)]">Unavailable while {providerInfo.label} is active</p>}
+                    {providerCompatible && !languageCompatible && <p className="mt-1 text-[11px] text-[var(--warning)]">{voice.primaryLanguage.toUpperCase()} is unavailable with the configured provider model</p>}
                     {voice.reconciliationState === "provider_missing" && <p className="mt-1 text-[11px] text-[var(--danger)]">Provider voice is missing. New generation is unavailable.</p>}
                   </div>
                   <DropdownMenu.Root>

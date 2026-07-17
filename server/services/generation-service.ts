@@ -9,7 +9,7 @@ import { validateGeneratedAudio } from "@/lib/audio/validation";
 import { getEnv } from "@/lib/config/env";
 import { prisma } from "@/lib/db/prisma";
 import { ProviderAuthenticationError, ProviderError, ProviderRateLimitError, ProviderTimeoutError } from "@/lib/providers/errors";
-import { isVoiceCompatibleWithProvider } from "@/lib/providers/compatibility";
+import { isVoiceCompatibleWithProvider, isVoiceLanguageSupported } from "@/lib/providers/compatibility";
 import { getVoiceProvider } from "@/lib/providers";
 import { assertVoiceOperationsEnabled, consumeOperationLimits, withProviderConcurrency } from "@/lib/rate-limit/rate-limiter";
 import { getObjectStorage } from "@/lib/storage";
@@ -100,6 +100,9 @@ export async function generateForUser(userId: string, unknownInput: unknown, req
         ? "This demo voice is unavailable while Cartesia is active. Choose a Cartesia voice."
         : `This voice belongs to a different provider. Choose a ${provider.name} voice.`;
     throw new AppError("VOICE_PROVIDER_MISMATCH", message, 409);
+  }
+  if (!isVoiceLanguageSupported(input.language, provider.capabilities.generationLanguages)) {
+    throw new AppError("UNSUPPORTED_LANGUAGE", "This language is not supported for speech generation by the configured provider model.", 422);
   }
 
   const characterCount = Array.from(input.text).length;
