@@ -2,6 +2,7 @@ import "server-only";
 
 import Cartesia, { toFile } from "@cartesia/cartesia-js";
 import { getEnv } from "@/lib/config/env";
+import { SUPPORTED_LANGUAGE_CODES } from "@/lib/languages";
 import {
   ProviderAuthenticationError,
   ProviderRateLimitError,
@@ -32,7 +33,7 @@ export class CartesiaVoiceProvider implements VoiceProvider {
     multilingual: true,
     styles: ["normal"],
     outputFormats: ["wav", "mp3"],
-    cloneLanguages: ["en", "fr", "ar"],
+    cloneLanguages: SUPPORTED_LANGUAGE_CODES,
   } as const;
   private readonly client: Cartesia;
   private readonly model: string;

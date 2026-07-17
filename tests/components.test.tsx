@@ -72,6 +72,11 @@ describe("clone panel", () => {
     expect(screen.getByRole("button", { name: "Clone Voice" })).toBeDisabled();
     click.mockRestore();
   });
+
+  it("offers Hindi as a primary language", () => {
+    render(<ToastProvider><CloneVoicePanel onCreated={vi.fn()} /></ToastProvider>);
+    expect(screen.getByRole("option", { name: "Hindi" })).toHaveValue("hi");
+  });
 });
 
 describe("generation panel", () => {
@@ -145,6 +150,12 @@ describe("product semantics", () => {
     expect(screen.getByText("Development account")).toBeInTheDocument();
     expect(screen.getByLabelText(/Retention preference/i)).toBeDisabled();
     expect(screen.getByText(/Scheduled retention is not active in this deployment/i)).toBeInTheDocument();
+  });
+
+  it("offers Hindi as the default language", () => {
+    render(<ToastProvider><SettingsClient account={{ name: "Maya", email: "maya@example.test", preferredLanguage: "hi", preferredAudioFormat: "wav", theme: "DARK", retentionDays: null }} operations={{ developmentSession: true, retentionWorkerEnabled: false }} /></ToastProvider>);
+    expect(screen.getByRole("combobox", { name: "Default language" })).toHaveValue("hi");
+    expect(screen.getByRole("option", { name: "Hindi" })).toHaveValue("hi");
   });
 
   it("enables scheduled retention only when a worker capability is present", () => {

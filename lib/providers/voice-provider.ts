@@ -1,3 +1,5 @@
+import type { SupportedLanguage } from "@/lib/languages";
+
 export type VoiceProviderName = "mock" | "cartesia";
 
 export type ProviderCapabilities = {
@@ -7,7 +9,7 @@ export type ProviderCapabilities = {
   multilingual: boolean;
   styles: readonly string[];
   outputFormats: readonly string[];
-  cloneLanguages: readonly string[];
+  cloneLanguages: readonly SupportedLanguage[];
 };
 
 export type CloneVoiceInput = {
@@ -16,7 +18,7 @@ export type CloneVoiceInput = {
   mimeType: string;
   name: string;
   description?: string;
-  language: string;
+  language: SupportedLanguage;
 };
 
 export type CloneVoiceResult = {
@@ -29,7 +31,7 @@ export type CloneVoiceResult = {
 export type SynthesizeInput = {
   providerVoiceId: string;
   text: string;
-  language: string;
+  language: SupportedLanguage;
   model: string;
 };
 

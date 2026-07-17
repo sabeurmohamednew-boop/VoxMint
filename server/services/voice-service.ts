@@ -14,6 +14,7 @@ import { currentPeriodKey, planLimits } from "@/server/services/usage-service";
 import { requireOwnedVoice } from "@/server/services/ownership-service";
 import { getObjectStorage } from "@/lib/storage";
 import { logger, safeUserId } from "@/lib/logging/logger";
+import type { SupportedLanguage } from "@/lib/languages";
 import { POLICY_VERSION } from "@/lib/policy/metadata";
 
 export const CONSENT_VERSION = POLICY_VERSION;
@@ -62,7 +63,7 @@ export async function cloneVoiceForUser(input: {
   userId: string;
   name: string;
   description?: string;
-  language: string;
+  language: SupportedLanguage;
   audio: ValidatedAudio;
   userAgentHash?: string;
   requestIp?: string;

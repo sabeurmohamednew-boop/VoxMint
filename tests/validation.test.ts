@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generationSchema, voiceNameSchema } from "@/lib/validation/schemas";
+import { cloneMetadataSchema, generationSchema, languageSchema, voiceNameSchema } from "@/lib/validation/schemas";
 
 describe("voice name validation", () => {
   it.each(["Studio Voice", "Voix Française", "Maya's Voice", "Voice-02"])("accepts %s", (name) => {
@@ -19,5 +19,30 @@ describe("generation validation", () => {
   });
   it("enforces the configured character limit", () => {
     expect(schema.safeParse({ ...valid, text: "x".repeat(21) }).success).toBe(false);
+  });
+});
+
+describe("language validation", () => {
+  it.each(["en", "fr", "ar", "hi"])("accepts supported language %s", (language) => {
+    expect(languageSchema.parse(language)).toBe(language);
+  });
+
+  it("accepts Hindi for cloning and generation", () => {
+    expect(cloneMetadataSchema.parse({
+      name: "Hindi Narration",
+      language: "hi",
+      consent: "true",
+    }).language).toBe("hi");
+    expect(generationSchema(20).parse({
+      voiceId: "cm00000000000000000000000",
+      text: "नमस्ते",
+      language: "hi",
+      style: "normal",
+      idempotencyKey: "hindi_request",
+    }).language).toBe("hi");
+  });
+
+  it("still rejects unsupported language codes", () => {
+    expect(languageSchema.safeParse("xx").success).toBe(false);
   });
 });
