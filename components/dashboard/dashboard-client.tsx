@@ -9,7 +9,7 @@ import { fetchJson } from "@/lib/api/client";
 import { isVoiceCompatibleWithProvider } from "@/lib/providers/compatibility";
 import type { GenerationDto, ProviderInfoDto, UsageDto, VoiceDto } from "@/lib/types/dto";
 
-export function DashboardClient({ initialVoices, initialSelectedVoiceId, initialGeneration, usage, providerInfo }: { initialVoices: VoiceDto[]; initialSelectedVoiceId: string | null; initialGeneration: GenerationDto | null; usage: UsageDto; providerInfo: ProviderInfoDto }) {
+export function DashboardClient({ initialVoices, initialSelectedVoiceId, initialGeneration, initialScript, usage, providerInfo }: { initialVoices: VoiceDto[]; initialSelectedVoiceId: string | null; initialGeneration: GenerationDto | null; initialScript?: string; usage: UsageDto; providerInfo: ProviderInfoDto }) {
   const [voices, setVoices] = useState(initialVoices);
   const [selectedId, setSelectedId] = useState(
     initialSelectedVoiceId,
@@ -28,6 +28,6 @@ export function DashboardClient({ initialVoices, initialSelectedVoiceId, initial
 
   const usableVoices = voices.filter((voice) => voice.status === "READY" && isVoiceCompatibleWithProvider(voice.provider, providerInfo.name));
   const isOnboarding = usableVoices.length === 0;
-  const generatePanel = <GenerateVoicePanel voices={voices} selectedVoiceId={selectedId} onSelectedVoice={selectVoice} generation={generation} onGenerated={setGeneration} onDeleted={(item) => void deleteGeneration(item)} usage={usage} providerInfo={providerInfo} onboardingStep={isOnboarding ? 2 : undefined} />;
+  const generatePanel = <GenerateVoicePanel voices={voices} selectedVoiceId={selectedId} onSelectedVoice={selectVoice} generation={generation} onGenerated={setGeneration} onDeleted={(item) => void deleteGeneration(item)} usage={usage} providerInfo={providerInfo} onboardingStep={isOnboarding ? 2 : undefined} initialScript={initialScript} />;
   return <>{isOnboarding ? <div className="dashboard-grid"><CloneVoicePanel onCreated={(voice) => { setVoices((current) => [voice, ...current]); setSelectedId(voice.id); }} onboardingStep={1} operationsEnabled={providerInfo.operationsEnabled} />{generatePanel}</div> : <div className="dashboard-grid dashboard-grid-single">{generatePanel}</div>}<RecentVoices voices={voices} selectedId={selectedId} onSelect={selectVoice} onDelete={deletedVoice} providerInfo={providerInfo} /></>;
 }

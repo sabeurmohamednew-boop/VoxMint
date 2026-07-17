@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AudioPlayer } from "@/components/audio/audio-player";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AppSelect } from "@/components/ui/app-select";
+import { AutosizeTextarea } from "@/components/ui/autosize-textarea";
 import { useToast } from "@/components/ui/toast";
 import { fetchJson } from "@/lib/api/client";
 import { isVoiceCompatibleWithProvider } from "@/lib/providers/compatibility";
@@ -23,6 +24,7 @@ export function GenerateVoicePanel({
   usage,
   providerInfo,
   onboardingStep,
+  initialScript,
 }: {
   voices: VoiceDto[];
   selectedVoiceId: string | null;
@@ -33,8 +35,9 @@ export function GenerateVoicePanel({
   usage: UsageDto;
   providerInfo: ProviderInfoDto;
   onboardingStep?: number;
+  initialScript?: string;
 }) {
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialScript ?? "");
   const [busy, setBusy] = useState(false);
   const [stateLabel, setStateLabel] = useState("Generate Voiceover");
   const [error, setError] = useState<string | null>(null);
@@ -73,12 +76,14 @@ export function GenerateVoicePanel({
           : null;
 
   useEffect(() => {
-    const draft = sessionStorage.getItem("voxmint-script-draft");
-    if (draft) window.requestAnimationFrame(() => setText(draft));
+    if (!initialScript) {
+      const draft = sessionStorage.getItem("voxmint-script-draft");
+      if (draft) window.requestAnimationFrame(() => setText(draft));
+    }
     const savedKey = sessionStorage.getItem("voxmint-generation-key");
     if (savedKey) idempotencyKey.current = savedKey;
     else sessionStorage.setItem("voxmint-generation-key", idempotencyKey.current);
-  }, []);
+  }, [initialScript]);
   useEffect(() => { if (text) sessionStorage.setItem("voxmint-script-draft", text); else sessionStorage.removeItem("voxmint-script-draft"); }, [text]);
   useEffect(() => {
     if (!generation || !focusNextOutput.current) return;
@@ -135,7 +140,7 @@ export function GenerateVoicePanel({
     <section id="generate" className="generate-panel panel p-5 sm:p-[22px]" aria-labelledby="generate-title">
       <div className="flex items-start gap-3">{onboardingStep && <span className="step-badge">{onboardingStep}</span>}<div><div className="flex flex-wrap items-center gap-2"><h2 id="generate-title" className="text-[19px] font-semibold tracking-[-0.015em]">Generate Voiceover</h2>{(providerInfo.isDemo || providerInfo.showBranding) && <span className="provider-badge" aria-label={`Active provider: ${providerInfo.label}`}>{providerInfo.label}</span>}</div><p className="mt-1 text-[13px] leading-5 text-[var(--foreground-secondary)]">Enter text and generate speech using one of your saved voices.</p></div></div>
       <div className="mt-6"><div className="flex items-center justify-between gap-3"><span className="text-[13px] font-semibold">Select voice</span>{selectableVoices.length > 0 && <Link href="/voices/new" className="inline-flex min-h-[44px] items-center gap-1.5 text-xs font-semibold text-[#8b55e8] hover:text-[#a16df1]"><Plus className="h-3.5 w-3.5" />Clone new voice</Link>}</div>{selectableVoices.length ? <div className="relative mt-2"><Mic2 className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-[#a267f3]" /><AppSelect label="Select voice" className="py-2 pl-11" value={selected?.id ?? selectableVoices[0]!.id} onValueChange={(value) => { resetGenerationKey(); onSelectedVoice(value); }} options={selectableVoices.map((voice) => ({ value: voice.id, label: `${voice.name} · ${voice.primaryLanguage.toUpperCase()} · ${voice.status === "READY" ? "Ready" : voice.status}` }))} /></div> : <div className="panel-quiet mt-2 p-4 text-sm text-[var(--foreground-secondary)]">{voices.length ? `No ${providerInfo.label} voices are available. Demo voices remain visible in My Voices but cannot be used with the active provider.` : "Create your first permitted voice before generating audio."}{!onboardingStep && <> <Link href="/voices/new" className="font-semibold text-[#8b55e8]">Clone a new voice</Link></>}</div>}</div>
-      <div className="mt-5"><label htmlFor="script" className="text-[13px] font-semibold">Enter text</label><div className="relative mt-2"><textarea id="script" className="field min-h-[164px] resize-y px-3 py-3 pb-9 text-sm leading-6" value={text} maxLength={MAX_CHARACTERS} onChange={(event) => updateText(event.target.value)} placeholder="Type or paste your script here…" /><span className={`absolute bottom-3 right-3 text-[11px] ${count > 4500 ? "text-[var(--warning)]" : "text-[var(--muted)]"}`}>{count.toLocaleString()} / {MAX_CHARACTERS.toLocaleString()}</span></div></div>
+      <div className="mt-5"><label htmlFor="script" className="text-[13px] font-semibold">Enter text</label><div className="relative mt-2"><AutosizeTextarea id="script" className="field min-h-[164px] resize-none px-3 py-3 pb-9 text-sm leading-6" value={text} maximumHeight={420} maxLength={MAX_CHARACTERS} onChange={(event) => updateText(event.target.value)} placeholder="Type or paste your script here…" /><span className={`pointer-events-none absolute bottom-3 right-3 text-[11px] ${count > 4500 ? "text-[var(--warning)]" : "text-[var(--muted)]"}`}>{count.toLocaleString()} / {MAX_CHARACTERS.toLocaleString()}</span></div></div>
       <div className="mt-3 flex flex-wrap items-center gap-2"><button type="button" className="button-secondary min-h-[40px] px-3" onClick={clearText} disabled={!text}><Eraser className="h-4 w-4" />Clear text</button><span className="ml-auto text-[11.5px] text-[var(--muted)]">≈ {estimatedSeconds}s</span></div>
       {overQuota && <p className="mt-3 text-xs text-[var(--warning)]">This script would exceed your monthly character limit.</p>}
       {error && <p className="mt-3 rounded-lg border border-[var(--danger)]/30 bg-[var(--danger)]/10 px-3 py-2.5 text-sm text-[#ff9aaa]" role="alert">{error}</p>}

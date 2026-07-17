@@ -13,8 +13,8 @@ export function BillingOverview({ state }: { state: PublicBillingState }) {
         <h2 className="mt-3 text-xl font-bold">{state.applicationPlanLabel}</h2>
         <p className="mt-2 text-sm leading-6 text-[var(--foreground-secondary)]">
           {state.mode === "development"
-            ? "This workspace uses development access. It is not a paid VoxMint subscription."
-            : "No application billing plan is configured for this deployment."}
+            ? "This workspace uses development access. No payment is attached to it."
+            : "No paid application access is configured for this deployment."}
         </p>
       </section>
 

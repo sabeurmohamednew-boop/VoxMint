@@ -6,6 +6,7 @@ export class AppError extends Error {
     public readonly code: string,
     message: string,
     public readonly status = 400,
+    public readonly headers: Readonly<Record<string, string>> = {},
   ) {
     super(message);
     this.name = "AppError";
@@ -28,7 +29,7 @@ export function apiError(error: unknown, id: string): Response {
     logger.info("api.error", { requestId: id, category: error.code, status: error.status });
     return Response.json(
       { error: { code: error.code, message: error.message, requestId: id } },
-      { status: error.status, headers: { "x-request-id": id } },
+      { status: error.status, headers: { ...error.headers, "x-request-id": id } },
     );
   }
   logger.error("api.error", { requestId: id, category: error instanceof Error ? error.name : "unknown", status: 500 });

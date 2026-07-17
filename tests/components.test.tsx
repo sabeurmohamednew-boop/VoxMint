@@ -13,6 +13,7 @@ import { VoicesClient } from "@/components/voices/voices-client";
 import { DashboardClient } from "@/components/dashboard/dashboard-client";
 import { HistoryClient } from "@/components/generations/history-client";
 import { ToastProvider } from "@/components/ui/toast";
+import { AutosizeTextarea } from "@/components/ui/autosize-textarea";
 import type { ProviderInfoDto, UsageDto, VoiceDto } from "@/lib/types/dto";
 
 const usage: UsageDto = {
@@ -170,7 +171,8 @@ describe("product semantics", () => {
     cartesiaVoice.generationCount = 3;
     render(<ToastProvider><VoicesClient initialVoices={[cartesiaVoice]} providerInfo={cartesiaProviderInfo} /></ToastProvider>);
     expect(screen.getByRole("link", { name: /Use voice/i })).toHaveAttribute("href", "/dashboard?voice=cartesia-voice#generate");
-    expect(screen.getByText("No preview available")).toBeInTheDocument();
+    expect(screen.getByText(/No generated sample yet/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Create a sample/i })).toHaveAttribute("href", "/dashboard?voice=cartesia-voice&sample=1#generate");
     expect(screen.getByText("Generations").nextElementSibling).toHaveTextContent("3");
     expect(screen.queryByText(/Generate test/i)).not.toBeInTheDocument();
   });
@@ -201,5 +203,17 @@ describe("audio player", () => {
   it("renders a meaningful empty state", () => {
     render(<ToastProvider><AudioPlayer generation={null} /></ToastProvider>);
     expect(screen.getByText("Your generated audio will appear here.")).toBeInTheDocument();
+  });
+});
+
+describe("autosizing script editor", () => {
+  it("grows to its cap and enables internal scrolling only after the cap", () => {
+    const scrollHeight = vi.spyOn(HTMLTextAreaElement.prototype, "scrollHeight", "get").mockReturnValue(600);
+    const { rerender } = render(<AutosizeTextarea aria-label="Script" style={{ minHeight: 164 }} maximumHeight={420} value="long" readOnly />);
+    const textarea = screen.getByLabelText("Script");
+    expect(textarea).toHaveStyle({ height: "420px", overflowY: "auto" });
+    scrollHeight.mockReturnValue(220);
+    rerender(<AutosizeTextarea aria-label="Script" style={{ minHeight: 164 }} maximumHeight={420} value="shorter" readOnly />);
+    expect(textarea).toHaveStyle({ height: "220px", overflowY: "hidden" });
   });
 });

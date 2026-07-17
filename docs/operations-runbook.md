@@ -38,7 +38,7 @@ Alert on repeated Cartesia authentication, timeout, rate-limit, or malformed-aud
 
 ## Testing
 
-Set an unmistakably isolated `TEST_DATABASE_URL` and run `npm run test:e2e`. The harness migrates and clears only that target. Read-only browser QA is separate from mutation-heavy E2E. `npm run test:cartesia:live` is never run by CI; it requires `LIVE_CARTESIA_E2E=true`, a separate test key and voice ID, and creates one tiny generation.
+Run `npm run test:e2e:readonly` for extension-free public-route, signed-out protection, hydration, security-header, health, redirect, network, and viewport checks. It neither signs in nor sends mutations. Set an unmistakably isolated `TEST_DATABASE_URL` before `npm run test:e2e`; that mutation suite migrates and clears only the isolated target. It refuses a missing URL, a URL equal to development/production, or a database name that is not visibly test-specific. `npm run test:cartesia:live` is never run by CI; it requires `LIVE_CARTESIA_E2E=true`, a separate test key and voice ID, and creates one tiny generation.
 
 ## Intentionally unavailable
 

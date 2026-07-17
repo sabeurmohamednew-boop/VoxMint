@@ -5,12 +5,14 @@ import { demoSignIn, e2eSignIn, googleSignIn } from "@/app/actions/auth-actions"
 import { VoxMintLogo } from "@/components/branding/voxmint-logo";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getEnv, isDemoAuthEnabled, isE2eTestAuthEnabled } from "@/lib/config/env";
+import { normalizeCallbackUrl } from "@/lib/auth/callback-url";
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   if (await getCurrentUser()) redirect("/dashboard");
   const params = await searchParams;
-  const callbackUrl = typeof params.callbackUrl === "string" ? params.callbackUrl : "/dashboard";
   const env = getEnv();
+  const callbackUrl = normalizeCallbackUrl(typeof params.callbackUrl === "string" ? params.callbackUrl : null, "/dashboard", env.NEXT_PUBLIC_APP_URL);
+  const sessionExpired = params.error === "SessionRequired" || params.reason === "session-expired";
   const googleReady = Boolean(env.AUTH_GOOGLE_ID && env.AUTH_GOOGLE_SECRET);
   const demoReady = isDemoAuthEnabled();
   const e2eReady = isE2eTestAuthEnabled();
@@ -23,6 +25,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           <p className="text-xs font-semibold uppercase tracking-[.14em] text-[#aa7afa]">Welcome back</p>
           <h1 className="mt-3 text-3xl font-bold tracking-[-0.04em]">Sign in to VoxMint</h1>
           <p className="mt-3 text-sm leading-6 text-[var(--foreground-secondary)]">Access your private voice library and generation history.</p>
+          {sessionExpired && <p className="mt-5 rounded-lg border border-[var(--warning)]/30 bg-[var(--warning)]/5 px-4 py-3 text-sm text-[var(--foreground-secondary)]" role="status">Your session expired. Sign in again to return to your workspace.</p>}
           <div className="mt-8 space-y-3">
             {googleReady && <form action={googleSignIn}><input type="hidden" name="callbackUrl" value={callbackUrl} /><button className="button-secondary w-full"><CircleUserRound className="h-5 w-5" />Continue with Google</button></form>}
             {demoReady && <form action={demoSignIn}><input type="hidden" name="callbackUrl" value={callbackUrl} /><button className="button-primary w-full"><Sparkles className="h-5 w-5" />Enter demo workspace</button><p className="mt-2 text-center text-[11px] text-[var(--muted)]">Development-only session · not a production account</p></form>}

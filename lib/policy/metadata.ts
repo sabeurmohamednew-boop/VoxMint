@@ -1,4 +1,5 @@
-export const POLICY_TEMPLATE_UPDATED_AT = "2026-07-16";
+export const POLICY_VERSION = "2026-07-16";
+export const POLICY_TEMPLATE_UPDATED_AT = POLICY_VERSION;
 
 export function formatPolicyDate(value: string): string {
   const [year, month, day] = value.split("-").map(Number);

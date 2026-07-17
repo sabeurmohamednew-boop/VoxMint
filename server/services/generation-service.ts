@@ -11,7 +11,7 @@ import { prisma } from "@/lib/db/prisma";
 import { ProviderAuthenticationError, ProviderError, ProviderRateLimitError, ProviderTimeoutError } from "@/lib/providers/errors";
 import { isVoiceCompatibleWithProvider } from "@/lib/providers/compatibility";
 import { getVoiceProvider } from "@/lib/providers";
-import { assertVoiceOperationsEnabled, consumeOperationLimits, getRateLimiter, configuredRateLimits, withProviderConcurrency } from "@/lib/rate-limit/rate-limiter";
+import { assertVoiceOperationsEnabled, consumeOperationLimits, withProviderConcurrency } from "@/lib/rate-limit/rate-limiter";
 import { getObjectStorage } from "@/lib/storage";
 import { generationStorageKey } from "@/lib/storage/object-storage";
 import type { GenerationDto } from "@/lib/types/dto";
@@ -21,6 +21,7 @@ import { currentPeriodKey, planLimits } from "@/server/services/usage-service";
 import { requireOwnedAudioObject, requireOwnedGeneration, requireOwnedVoice } from "@/server/services/ownership-service";
 import { logger, safeUserId } from "@/lib/logging/logger";
 import { compensateStoredObject } from "@/server/services/storage-compensation";
+import { deriveGenerationTitle } from "@/lib/generations/title";
 
 export async function listGenerations(userId: string, limit = 50, provider?: "mock" | "cartesia"): Promise<GenerationDto[]> {
   const generations = await prisma.generation.findMany({
@@ -149,7 +150,7 @@ export async function generateForUser(userId: string, unknownInput: unknown, req
           voiceId: voice.id,
           retryOfId: input.retryOfId,
           idempotencyKey: input.idempotencyKey,
-          title: input.text.slice(0, 48),
+          title: deriveGenerationTitle(input.text),
           text: input.text,
           textHash,
           characterCount,
@@ -294,7 +295,6 @@ export async function getGenerationForUser(userId: string, generationId: string)
 }
 
 export async function deleteGenerationForUser(userId: string, generationId: string): Promise<void> {
-  await getRateLimiter().consume(`generation-mutation:${userId}`, configuredRateLimits().mutation);
   const generation = await prisma.generation.findFirst({ where: { id: generationId, userId } });
   if (!generation || generation.status === "DELETED") return;
   await prisma.generation.update({ where: { id: generation.id }, data: { status: "DELETING" } });
@@ -310,7 +310,6 @@ export async function renameGenerationForUser(
   generationId: string,
   title: unknown,
 ): Promise<GenerationDto> {
-  await getRateLimiter().consume(`generation-mutation:${userId}`, configuredRateLimits().mutation);
   const parsedTitle = typeof title === "string" ? title.trim() : "";
   if (parsedTitle.length < 2 || parsedTitle.length > 80) {
     throw new AppError("INVALID_TITLE", "Use a title between 2 and 80 characters.", 422);

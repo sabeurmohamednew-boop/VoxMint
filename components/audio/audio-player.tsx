@@ -3,7 +3,7 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Clipboard, Download, Edit3, LoaderCircle, MoreVertical, Music2, Pause, Play, RotateCcw, RotateCw, Trash2, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { downloadAudio } from "@/lib/audio/client";
+import { diagnoseAudioPlaybackFailure, downloadAudio } from "@/lib/audio/client";
 import { formatDuration, safeBaseName } from "@/lib/audio/utils";
 import type { GenerationDto } from "@/lib/types/dto";
 import { useToast } from "@/components/ui/toast";
@@ -85,6 +85,16 @@ export function AudioPlayer({ generation, selectedVoiceId, onDelete, onRename }:
     }
   }
 
+  async function handlePlaybackError() {
+    const audio = audioRef.current;
+    setPlaying(false);
+    setLoading(false);
+    if (activeAudio === audio) activeAudio = null;
+    if (!generation?.audioUrl) return;
+    const message = await diagnoseAudioPlaybackFailure(generation.audioUrl, audio?.error?.code);
+    setError(message);
+  }
+
   if (!generation?.audioUrl) {
     const missing = generation?.status === "READY" && !generation.audioAvailable;
     return (
@@ -111,7 +121,7 @@ export function AudioPlayer({ generation, selectedVoiceId, onDelete, onRename }:
         onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime * 1000)}
         onLoadedMetadata={(event) => { setDuration(event.currentTarget.duration * 1000); setLoading(false); }}
         onEnded={() => { setPlaying(false); setCurrentTime(0); }}
-        onError={() => { setPlaying(false); setLoading(false); setError("This audio could not be loaded."); }}
+        onError={() => void handlePlaybackError()}
       />
       {voiceMismatch && <p className="mb-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-2 text-xs text-[var(--foreground-secondary)]">Previous result generated with {generation.voiceName}.</p>}
       <div className="flex items-center gap-3">
@@ -122,6 +132,11 @@ export function AudioPlayer({ generation, selectedVoiceId, onDelete, onRename }:
         </div>
       </div>
       {error && <p className="mt-3 text-xs text-[var(--danger)]" role="alert">{error}</p>}
+      <details className="mt-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-2 text-xs">
+        <summary className="min-h-6 cursor-pointer font-medium text-[var(--foreground-secondary)]">View full title and script</summary>
+        <p className="mt-3 break-words font-semibold">{generation.title || "Untitled voiceover"}</p>
+        <p className="mt-2 max-h-52 overflow-y-auto whitespace-pre-wrap break-words leading-5 text-[var(--muted)]">{generation.text}</p>
+      </details>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button type="button" className="icon-button h-10 min-h-10 w-10 min-w-10" onClick={() => void togglePlay()} aria-label={playing ? "Pause audio" : "Play audio"}>{loading ? <LoaderCircle className="h-[18px] w-[18px] animate-spin" /> : playing ? <Pause className="h-[18px] w-[18px]" /> : <Play className="h-[18px] w-[18px] fill-current" />}</button>
         <button type="button" className="icon-button hidden h-10 min-h-10 w-10 min-w-10 sm:inline-flex" onClick={() => seek(-10)} aria-label="Skip back 10 seconds"><RotateCcw className="h-[17px] w-[17px]" /></button>

@@ -90,7 +90,7 @@ test("permitted voice creation and generation workflow", async ({ page }) => {
 
 test("product semantics remain honest in development", async ({ page }) => {
   await signIn(page);
-  await page.goto("/billing");
+  await page.goto("/status");
   await expect(page.getByText("Billing unavailable").first()).toBeVisible();
   await expect(page.getByText("Payments unavailable").first()).toBeVisible();
   await expect(page.getByText(/VoxMint Pro/i)).toHaveCount(0);
@@ -121,7 +121,7 @@ test("read-only product and responsive browser review", async ({ page }) => {
   await page.getByLabel("Filter by provider").first().selectOption("mock");
   await expect(page).toHaveURL(/provider=mock/);
 
-  await page.goto("/billing");
+  await page.goto("/status");
   await expect(page.getByText("Billing unavailable").first()).toBeVisible();
   await expect(page.getByText("Demo allowance").first()).toBeVisible();
   await expect(page.getByText("Payments unavailable").first()).toBeVisible();

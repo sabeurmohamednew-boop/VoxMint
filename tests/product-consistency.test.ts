@@ -15,13 +15,31 @@ describe("product consistency source guards", () => {
     const navigation = source("components/app-shell/app-navigation.tsx");
     expect(navigation).toContain("Usage &amp; deployment");
     expect(navigation).toContain("Service status");
+    expect(navigation).toContain('href="/status"');
     expect(navigation).not.toMatch(/Go Pro|Upgrade now/i);
+  });
+
+  it("keeps Service status canonical while preserving the legacy redirect", () => {
+    expect(source("app/(app)/status/page.tsx")).toContain('title: "Service status"');
+    expect(source("app/(app)/billing/page.tsx")).toContain('permanentRedirect("/status")');
+  });
+
+  it("uses one central policy version for new consent records and legal templates", () => {
+    expect(source("lib/policy/metadata.ts")).toContain("POLICY_VERSION");
+    expect(source("server/services/voice-service.ts")).toContain("CONSENT_VERSION = POLICY_VERSION");
+  });
+
+  it("rejects unverifiable upload sizes before parsing and keeps source samples in memory", () => {
+    const route = source("app/api/voices/clone/route.ts");
+    expect(route.indexOf("assertUploadContentLength")).toBeLessThan(route.indexOf("request.formData"));
+    const validation = source("lib/audio/validation.ts");
+    expect(validation).not.toMatch(/node:fs|node:os|mkdtemp|tmpdir|writeFile/u);
   });
 
   it("labels usage as a local deployment ledger rather than a live provider balance", () => {
     const usage = source("app/(app)/usage/page.tsx");
     expect(usage).toContain("VoxMint-tracked Cartesia");
-    expect(usage).toContain("not a live Cartesia subscription balance");
+    expect(usage).toContain("not a live Cartesia provider-account balance");
     expect(usage).not.toContain("usage.plan");
   });
 

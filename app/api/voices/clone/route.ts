@@ -6,6 +6,7 @@ import { getEnv } from "@/lib/config/env";
 import { cloneMetadataSchema } from "@/lib/validation/schemas";
 import { cloneVoiceForUser } from "@/server/services/voice-service";
 import { assertSameOriginMutation, requestIp } from "@/lib/security/request-origin";
+import { assertUploadContentLength } from "@/lib/uploads/content-length";
 
 export const runtime = "nodejs";
 
@@ -15,10 +16,7 @@ export async function POST(request: Request) {
   if (!user) return unauthorized(id);
   try {
     assertSameOriginMutation(request);
-    const declaredLength = Number(request.headers.get("content-length") ?? 0);
-    if (declaredLength > getEnv().VOICE_SAMPLE_MAX_BYTES + 64 * 1024) {
-      throw new AppError("PAYLOAD_TOO_LARGE", "The upload is too large.", 413);
-    }
+    assertUploadContentLength(request.headers.get("content-length"), getEnv().VOICE_SAMPLE_MAX_BYTES);
     const form = await request.formData();
     const file = form.get("sample");
     if (!(file instanceof File)) throw new AppError("MISSING_SAMPLE", "Choose an audio sample.", 422);

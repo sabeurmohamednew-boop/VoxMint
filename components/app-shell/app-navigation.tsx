@@ -48,7 +48,7 @@ export function AppSidebar() {
         <div className="panel-quiet p-4">
           <div className="flex items-center gap-2 text-[#a36afb]"><Gauge className="h-5 w-5" /><span className="font-semibold">Usage &amp; deployment</span></div>
           <p className="mt-3 text-[12.5px] leading-5 text-[var(--foreground-secondary)]">Review VoxMint-tracked usage and service availability.</p>
-          <Link href="/billing" className="button-secondary mt-4 w-full min-h-[40px]">Service status</Link>
+          <Link href="/status" className="button-secondary mt-4 w-full min-h-[40px]">Service status</Link>
         </div>
       </div>
       <div className="border-t border-[var(--border-subtle)] px-5 py-4">

@@ -19,7 +19,7 @@ test("public pages have no serious automated accessibility violations", async ({
 test("authenticated workspace pages have no serious automated accessibility violations", async ({ page }) => {
   await page.goto("/login");
   await page.getByRole("button", { name: "Sign in as Test User A" }).click();
-  for (const path of ["/dashboard", "/voices", "/history", "/settings", "/usage", "/billing"]) await assertAccessible(page, path);
+  for (const path of ["/dashboard", "/voices", "/history", "/settings", "/usage", "/status"]) await assertAccessible(page, path);
 });
 
 test("core controls, menus, and dialogs remain keyboard reachable", async ({ page }) => {

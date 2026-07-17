@@ -107,8 +107,9 @@ export function VoicesClient({
                 </dl>
                 <div className="mt-auto flex flex-col items-stretch gap-2 pt-5 sm:flex-row sm:items-center">
                   {usable ? <Link href={`/dashboard?voice=${encodeURIComponent(voice.id)}#generate`} className="button-primary w-full px-4 sm:flex-1"><Mic2 className="h-4 w-4" />Use voice</Link> : <button type="button" className="button-primary w-full px-4 sm:flex-1" disabled title={compatible ? "Voice is not ready" : `Unavailable with ${providerInfo.label}`}><Mic2 className="h-4 w-4" />Use voice</button>}
-                  {voice.latestGeneration?.audioUrl ? <button type="button" className="button-secondary min-h-[44px] w-full px-3 text-[11px] sm:w-auto" onClick={() => setPreview(voice)}>Play latest generation</button> : <span className="button-secondary min-h-[44px] w-full cursor-default px-3 text-[11px] text-[var(--muted)] sm:w-auto" title="No saved playable generation is available">No preview available</span>}
+                  {voice.latestGeneration?.audioUrl ? <button type="button" className="button-secondary min-h-[44px] w-full px-3 text-[11px] sm:w-auto" onClick={() => setPreview(voice)}>Play latest generation</button> : usable ? <Link href={`/dashboard?voice=${encodeURIComponent(voice.id)}&sample=1#generate`} className="button-secondary min-h-[44px] w-full px-3 text-[11px] sm:w-auto" title="Prefill an editable script without generating audio">Create a sample</Link> : <span className="button-secondary min-h-[44px] w-full cursor-default px-3 text-[11px] text-[var(--muted)] sm:w-auto">Sample unavailable</span>}
                 </div>
+                {!voice.latestGeneration?.audioUrl && <p className="mt-2 text-[11px] leading-4 text-[var(--muted)]">No generated sample yet. The sample action prefills an editable script for generated speech; it never uses the uploaded source sample.</p>}
               </article>
             );
           })}

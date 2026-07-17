@@ -11,7 +11,7 @@ VoxMint is deployable as a single Next.js runtime backed by managed PostgreSQL, 
 - Use Cartesia for voice cloning and speech generation.
 - Configure Google OAuth for production authentication. Email magic links are optional when both email variables are present.
 
-Audio remains behind `/api/generation-audio/[generationId]`, where the server verifies ownership before streaming it. Source voice samples are validated in memory and are not written to application storage.
+Audio remains behind `/api/generation-audio/[generationId]`, where the server verifies ownership before streaming it. Source voice samples require a declared request length, are validated in memory, and are not written to application storage or a temporary directory. Because no application temporary file is created, success, rejection, timeout, abort, and exception paths have no sample artifact to clean up.
 
 ## Environment mapping
 
@@ -46,7 +46,7 @@ Database migrations are forward-only in normal operation. Before a schema-changi
 
 - Payments and checkout are unavailable. The `BillingAdapter` interface is the integration boundary; no paid VoxMint plan is advertised today.
 - Scheduled retention is unavailable unless `RETENTION_WORKER_ENABLED=true` and an actual scheduled deletion worker has been deployed. The UI cannot save an unenforced retention value.
-- Voice previews are not stored. The voice library says "No preview available" and does not silently generate paid test audio.
+- Source-sample previews are not stored. The voice library says "No generated sample yet" and links to an editable sample script; it never generates paid audio automatically.
 - When a voice has an existing playable generation, the library can play that saved object without a new provider call.
 - Abuse reporting is a configured operator link or email, not an in-app case-management system.
 
@@ -66,6 +66,14 @@ Use a private bucket and a token limited to that bucket. VoxMint never returns l
 ## Usage and reconciliation
 
 Usage pages report committed operations recorded by this deployment, released/failed reservations, demo usage, and configured ceilings. They are not a live Cartesia account balance. `npm run db:reconcile-voices` checks only locally registered Cartesia voices and is dry-run by default. `-- --apply` marks provider-missing records as failed with reconciliation metadata; it never imports unrelated voices, deletes provider voices, or modifies mock generations.
+
+`/status` is the canonical authenticated Service status route. `/billing` is a permanent compatibility redirect and contains no duplicate page implementation.
+
+## Browser security and hydration troubleshooting
+
+VoxMint sends a same-origin Content Security Policy with explicit script, style, image, font, media, connection, worker, form, frame, and object rules. Inline script/style are allowed because Next.js emits framework bootstrap and style content; development additionally permits `unsafe-eval` and loopback WebSockets for source maps and hot reload. Production removes `unsafe-eval`, upgrades insecure requests, and adds HSTS. Provider credentials and private storage origins are not CSP sources.
+
+When a development browser reports a hydration mismatch, reproduce it in Playwright's bundled Chromium or another clean profile first. Attributes mentioning Grammarly or another extension, which disappear in the clean profile, are extension-injected DOM mutations rather than application output. Do not add global hydration suppression. If the warning reproduces cleanly, capture the route, server HTML, client console, and smallest differing element, then fix that nondeterministic render source and add a regression test.
 
 ## Public launch
 

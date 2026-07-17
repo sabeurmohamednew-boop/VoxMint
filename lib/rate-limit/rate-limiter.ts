@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
 import { Redis } from "@upstash/redis";
 import { AppError } from "@/lib/api/response";
 import { getEnv } from "@/lib/config/env";
@@ -9,6 +10,19 @@ export type RateLimitRule = { limit: number; windowSeconds: number };
 export interface RateLimiter {
   consume(key: string, rule: RateLimitRule): Promise<void>;
   acquire(key: string, limit: number, ttlSeconds: number): Promise<() => Promise<void>>;
+}
+
+export function safeRateLimitIdentifier(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 24);
+}
+
+function rateLimitError(retryAfterSeconds: number): AppError {
+  return new AppError(
+    "RATE_LIMITED",
+    "Too many requests. Try again shortly.",
+    429,
+    { "retry-after": String(Math.max(1, Math.ceil(retryAfterSeconds))) },
+  );
 }
 
 export class MemoryRateLimiter implements RateLimiter {
@@ -23,7 +37,7 @@ export class MemoryRateLimiter implements RateLimiter {
       return;
     }
     if (current.count >= rule.limit) {
-      throw new AppError("RATE_LIMITED", "Too many requests. Try again shortly.", 429);
+      throw rateLimitError((current.resetsAt - now) / 1000);
     }
     current.count += 1;
   }
@@ -59,7 +73,10 @@ export class UpstashRateLimiter implements RateLimiter {
     const bucket = `voxmint:rate:${key}:${Math.floor(Date.now() / (rule.windowSeconds * 1000))}`;
     const count = await this.redis.incr(bucket);
     if (count === 1) await this.redis.expire(bucket, rule.windowSeconds + 1);
-    if (count > rule.limit) throw new AppError("RATE_LIMITED", "Too many requests. Try again shortly.", 429);
+    if (count > rule.limit) {
+      const elapsedInWindow = Math.floor(Date.now() / 1000) % rule.windowSeconds;
+      throw rateLimitError(rule.windowSeconds - elapsedInWindow);
+    }
   }
 
 
@@ -105,8 +122,21 @@ export async function consumeOperationLimits(
   const limiter = getRateLimiter();
   const rule = configuredRateLimits()[operation];
   await Promise.all([
-    limiter.consume(`${operation}:user:${userId}`, rule),
-    limiter.consume(`${operation}:ip:${ip}`, rule),
+    limiter.consume(`${operation}:user:${safeRateLimitIdentifier(userId)}`, rule),
+    limiter.consume(`${operation}:ip:${safeRateLimitIdentifier(ip)}`, rule),
+  ]);
+}
+
+export async function consumeMutationLimits(
+  operation: string,
+  userId: string,
+  ip: string,
+): Promise<void> {
+  const rule = configuredRateLimits().mutation;
+  const rateLimiter = getRateLimiter();
+  await Promise.all([
+    rateLimiter.consume(`mutation:${operation}:user:${safeRateLimitIdentifier(userId)}`, rule),
+    rateLimiter.consume(`mutation:${operation}:ip:${safeRateLimitIdentifier(ip)}`, rule),
   ]);
 }
 
@@ -118,7 +148,7 @@ export function assertVoiceOperationsEnabled(): void {
 
 export async function withProviderConcurrency<T>(userId: string, operation: () => Promise<T>): Promise<T> {
   const env = getEnv();
-  const release = await getRateLimiter().acquire(`provider:user:${userId}`, env.MAX_CONCURRENT_PROVIDER_REQUESTS, 120);
+  const release = await getRateLimiter().acquire(`provider:user:${safeRateLimitIdentifier(userId)}`, env.MAX_CONCURRENT_PROVIDER_REQUESTS, 120);
   try {
     return await operation();
   } finally {

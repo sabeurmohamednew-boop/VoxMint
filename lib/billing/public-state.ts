@@ -24,7 +24,7 @@ export function createPublicBillingState(input: {
     enabled: false,
     mode: input.developmentSession ? "development" : "disabled",
     applicationPlanLabel: input.developmentSession ? "Developer access" : "Billing unavailable",
-    providerAllowanceLabel: `${input.providerInfo.label} allowance`,
+    providerAllowanceLabel: `${input.providerInfo.label} configured ceiling`,
     providerName: input.providerInfo.name,
     characterAllowance: input.usage.characterLimit,
     voiceAllowance: input.usage.voiceLimit,

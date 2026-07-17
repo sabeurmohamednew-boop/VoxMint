@@ -68,7 +68,7 @@ Important locations:
    RATE_LIMIT_PROVIDER=memory
    ```
 
-   `DEV_BYPASS_AUTH=true` is rejected in production. The mock provider is also refused in production unless the explicit dangerous override is set.
+   `DEV_BYPASS_AUTH=true` and the mock provider are both rejected in production.
 
 3. Generate the Prisma client, apply the migration, and seed development content:
 
@@ -88,7 +88,7 @@ Important locations:
 
 When `VOICE_PROVIDER=mock`, the seed creates a synthetic demo user and fictional mock voices. In Cartesia mode it skips mock voice records, so fake voices are not mixed into a real provider workspace.
 
-The current `FREE` and `PRO` database values are internal allowance tiers, not paid VoxMint products. The Billing page deliberately presents development access, the active provider allowance, and payment availability as separate concepts. Checkout remains hidden until a real `BillingAdapter`, webhook handling, and persisted application-plan mapping exist.
+The current `FREE` and `PRO` database values are internal allowance tiers, not paid VoxMint products. The canonical `/status` page presents development access, configured provider ceilings, and payment availability as separate concepts; `/billing` permanently redirects there for compatibility. Checkout remains hidden until a real `BillingAdapter`, webhook handling, and persisted application-access mapping exist.
 
 ## Environment variables
 
@@ -153,7 +153,7 @@ http://localhost:3000/api/auth/callback/google
 https://your-domain.example/api/auth/callback/google
 ```
 
-Set `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `AUTH_SECRET`, and the production `NEXT_PUBLIC_APP_URL`. Logged-out users are redirected to `/login` with the intended protected return URL preserved by Auth.js.
+Set `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `AUTH_SECRET`, and the production `NEXT_PUBLIC_APP_URL`. Logged-out users are redirected to `/login` with the intended protected return URL preserved by Auth.js. Server actions reduce root-relative and canonical-origin callback URLs to a local path; external, protocol-relative, backslash, control-character, credential-bearing, and malformed values fall back to `/dashboard`.
 
 ## Cartesia
 
@@ -202,6 +202,7 @@ npm run typecheck    # Next route types + strict TypeScript
 npm test             # unit, component, and adapter integration tests
 npm run test:watch   # Vitest watch mode
 npm run test:e2e     # Playwright desktop and mobile workflows
+npm run test:e2e:readonly # clean-browser checks that never sign in or mutate data
 npm run db:generate  # generate Prisma client
 npm run db:migrate   # apply a development migration
 npm run db:deploy    # apply committed migrations in production
@@ -222,8 +223,8 @@ Playwright requires an isolated PostgreSQL database or schema whose URL visibly 
 
 - Every protected read and mutation derives the user ID from the authenticated session.
 - Cross-user object IDs return not found and never authorize from client state.
-- Uploads are capped, magic-byte detected, decoded, duration checked, and never executed.
-- Source samples are not retained after provider cloning.
+- Uploads require a declared size before multipart buffering, are capped, magic-byte detected, decoded, duration checked, and never executed.
+- Source samples are validated only in memory and are not retained in application storage or temporary files after provider cloning.
 - Usage is reserved and committed in serializable database transactions, then released on provider or storage failure.
 - Displayed Cartesia usage is the VoxMint deployment ledger and configured ceiling, not the authoritative Cartesia subscription balance.
 - Generated audio is stored outside PostgreSQL and streamed through an authenticated, private, no-store endpoint with byte-range support.

@@ -26,7 +26,7 @@ describe("public billing state", () => {
   it("separates development access from provider allowance and excludes secrets", () => {
     const state = createPublicBillingState({ developmentSession: true, providerInfo, usage });
     const serialized = JSON.stringify(state);
-    expect(state).toMatchObject({ enabled: false, mode: "development", applicationPlanLabel: "Developer access", providerAllowanceLabel: "Cartesia allowance", checkoutAvailable: false });
+    expect(state).toMatchObject({ enabled: false, mode: "development", applicationPlanLabel: "Developer access", providerAllowanceLabel: "Cartesia configured ceiling", checkoutAvailable: false });
     expect(serialized).not.toContain("PRO");
     expect(serialized).not.toMatch(/api.?key|secret|token/i);
   });

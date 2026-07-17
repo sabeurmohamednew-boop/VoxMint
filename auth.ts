@@ -88,7 +88,7 @@ if (authPolicy.e2eEnabled && isE2eTestAuthEnabled()) {
   );
 }
 
-const protectedPrefixes = ["/dashboard", "/voices", "/history", "/settings", "/usage", "/billing"];
+const protectedPrefixes = ["/dashboard", "/voices", "/history", "/settings", "/usage", "/status", "/billing"];
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),

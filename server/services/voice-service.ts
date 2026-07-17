@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { isVoiceCompatibleWithProvider } from "@/lib/providers/compatibility";
 import { ProviderError } from "@/lib/providers/errors";
 import { getVoiceProvider } from "@/lib/providers";
-import { assertVoiceOperationsEnabled, consumeOperationLimits, getRateLimiter, configuredRateLimits, withProviderConcurrency } from "@/lib/rate-limit/rate-limiter";
+import { assertVoiceOperationsEnabled, consumeOperationLimits, getRateLimiter, safeRateLimitIdentifier, withProviderConcurrency } from "@/lib/rate-limit/rate-limiter";
 import type { VoiceDto } from "@/lib/types/dto";
 import { updateVoiceSchema } from "@/lib/validation/schemas";
 import { voiceDto } from "@/server/services/mappers";
@@ -14,8 +14,9 @@ import { currentPeriodKey, planLimits } from "@/server/services/usage-service";
 import { requireOwnedVoice } from "@/server/services/ownership-service";
 import { getObjectStorage } from "@/lib/storage";
 import { logger, safeUserId } from "@/lib/logging/logger";
+import { POLICY_VERSION } from "@/lib/policy/metadata";
 
-export const CONSENT_VERSION = "2026-07-16";
+export const CONSENT_VERSION = POLICY_VERSION;
 export const CONSENT_STATEMENT =
   "I confirm that I own this voice or have explicit permission from the speaker to clone and use it.";
 
@@ -79,7 +80,7 @@ export async function cloneVoiceForUser(input: {
     include: { _count: { select: { generations: { where: { deletedAt: null } } } } },
   });
   if (existing) return voiceDto(existing);
-  const releaseRequest = await getRateLimiter().acquire(`clone-request:${input.userId}:${idempotencyKey}`, 1, 180);
+  const releaseRequest = await getRateLimiter().acquire(`clone-request:${safeRateLimitIdentifier(input.userId)}:${safeRateLimitIdentifier(idempotencyKey)}`, 1, 180);
   try {
   const duplicateAfterLock = await prisma.voice.findUnique({
     where: { userId_idempotencyKey: { userId: input.userId, idempotencyKey } },
@@ -188,7 +189,6 @@ export async function cloneVoiceForUser(input: {
 }
 
 export async function updateVoiceForUser(userId: string, voiceId: string, unknownInput: unknown) {
-  await getRateLimiter().consume(`voice-mutation:${userId}`, configuredRateLimits().mutation);
   const input = updateVoiceSchema.parse(unknownInput);
   const voice = await requireOwnedVoice(userId, voiceId);
   const provider = getVoiceProvider();
@@ -221,7 +221,6 @@ export async function updateVoiceForUser(userId: string, voiceId: string, unknow
 }
 
 export async function deleteVoiceForUser(userId: string, voiceId: string): Promise<void> {
-  await getRateLimiter().consume(`voice-mutation:${userId}`, configuredRateLimits().mutation);
   const voice = await prisma.voice.findFirst({ where: { id: voiceId, userId } });
   if (!voice || voice.status === "DELETED") return;
   const provider = getVoiceProvider();
