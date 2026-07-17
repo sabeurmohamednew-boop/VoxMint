@@ -13,4 +13,13 @@ describe("mock provider integration", () => {
     const metadata = await parseBuffer(result.bytes, { mimeType: result.mimeType, size: result.bytes.byteLength });
     expect(metadata.format.duration).toBeGreaterThan(1);
   });
+
+  it("keeps Hindi synthesis deterministic without external provider calls", async () => {
+    const provider = new MockVoiceProvider();
+    const input = { providerVoiceId: "mock_hindi", text: "नमस्ते दुनिया", language: "hi" as const, model: "mock" };
+    const first = await provider.synthesize(input);
+    const second = await provider.synthesize(input);
+    expect(first.bytes).toEqual(second.bytes);
+    expect(Buffer.from(first.bytes).subarray(0, 4).toString()).toBe("RIFF");
+  });
 });

@@ -14,6 +14,7 @@ const capabilities: ProviderCapabilities = {
   styles: ["normal"],
   outputFormats: ["wav"],
   cloneLanguages: ["en"],
+  generationLanguages: ["en"],
 };
 
 describe("public provider information", () => {
@@ -27,6 +28,10 @@ describe("public provider information", () => {
       name: "cartesia",
       label: "Cartesia",
       isDemo: false,
+      capabilities: {
+        cloneLanguages: ["en"],
+        generationLanguages: ["en"],
+      },
     });
   });
 

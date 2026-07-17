@@ -6,6 +6,7 @@ import { updateAccountSchema } from "@/lib/validation/schemas";
 import { getObjectStorage } from "@/lib/storage";
 import { getVoiceProvider } from "@/lib/providers";
 import { getEnv } from "@/lib/config/env";
+import { intersectLanguageCodes } from "@/lib/languages";
 import { logger, safeUserId } from "@/lib/logging/logger";
 
 export async function getAccount(userId: string) {
@@ -30,6 +31,16 @@ export async function getAccount(userId: string) {
 
 export async function updateAccount(userId: string, unknownInput: unknown) {
   const input = updateAccountSchema.parse(unknownInput);
+  if (input.preferredLanguage) {
+    const provider = getVoiceProvider();
+    const preferenceLanguages = intersectLanguageCodes(
+      provider.capabilities.cloneLanguages,
+      provider.capabilities.generationLanguages,
+    );
+    if (!preferenceLanguages.includes(input.preferredLanguage)) {
+      throw new AppError("UNSUPPORTED_LANGUAGE", "This language is not available for voice creation and generation with the configured provider model.", 422);
+    }
+  }
   if (input.retentionDays && !getEnv().RETENTION_WORKER_ENABLED) {
     throw new AppError("RETENTION_UNAVAILABLE", "Automated retention is not enabled on this deployment.", 409);
   }

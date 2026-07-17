@@ -6,25 +6,35 @@ import { useState } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
 import { fetchJson } from "@/lib/api/client";
-import { SUPPORTED_LANGUAGES } from "@/lib/languages";
+import { getLanguageLabel, getLanguageOptions, intersectLanguageCodes, isSupportedLanguage } from "@/lib/languages";
+import type { ProviderInfoDto } from "@/lib/types/dto";
 
 type Account = { name: string | null; email: string | null; preferredLanguage: string; preferredAudioFormat: string; theme: "SYSTEM" | "DARK" | "LIGHT"; retentionDays: number | null };
 type Operations = { developmentSession: boolean; retentionWorkerEnabled: boolean };
 
-export function SettingsClient({ account, operations }: { account: Account; operations: Operations }) {
+export function SettingsClient({ account, operations, providerInfo }: { account: Account; operations: Operations; providerInfo: ProviderInfoDto }) {
   const [form, setForm] = useState({ name: account.name ?? "", preferredLanguage: account.preferredLanguage, preferredAudioFormat: account.preferredAudioFormat, theme: account.theme, retentionDays: account.retentionDays ? String(account.retentionDays) : "none" });
   const [busy, setBusy] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const { showToast } = useToast();
+  const supportedLanguageCodes = intersectLanguageCodes(
+    providerInfo.capabilities.cloneLanguages,
+    providerInfo.capabilities.generationLanguages,
+  );
+  const languageOptions = getLanguageOptions(supportedLanguageCodes);
+  const preferredLanguageAvailable = isSupportedLanguage(form.preferredLanguage) && supportedLanguageCodes.includes(form.preferredLanguage);
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
     try {
-      const { retentionDays, ...preferences } = form;
-      const payload = operations.retentionWorkerEnabled
-        ? { ...preferences, retentionDays: retentionDays !== "none" ? Number(retentionDays) : null }
+      const { retentionDays, preferredLanguage, ...preferences } = form;
+      const compatiblePreferences = preferredLanguageAvailable
+        ? { ...preferences, preferredLanguage }
         : preferences;
+      const payload = operations.retentionWorkerEnabled
+        ? { ...compatiblePreferences, retentionDays: retentionDays !== "none" ? Number(retentionDays) : null }
+        : compatiblePreferences;
       await fetchJson("/api/account", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
       document.documentElement.classList.toggle("light", form.theme === "LIGHT");
       showToast("Settings saved");
@@ -45,7 +55,7 @@ export function SettingsClient({ account, operations }: { account: Account; oper
       <section className="panel p-5 sm:p-6"><div className="flex flex-wrap items-center gap-2"><h2 className="text-base font-semibold">Profile &amp; preferences</h2>{operations.developmentSession && <span className="development-badge">Development account</span>}</div>{operations.developmentSession && <p className="mt-2 text-xs leading-5 text-[var(--muted)]">This identity is provided by local development authentication and is not a permanent production account.</p>}<div className="mt-5 grid gap-5 sm:grid-cols-2">
         <label className="text-[13px] font-semibold">Display name<input className="field mt-2 px-3" value={form.name} minLength={2} maxLength={80} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
         <label className="text-[13px] font-semibold">Email<input className="field mt-2 px-3 opacity-70" value={account.email ?? ""} disabled /></label>
-        <label className="text-[13px] font-semibold">Default language<select className="field mt-2 px-3" value={form.preferredLanguage} onChange={(event) => setForm({ ...form, preferredLanguage: event.target.value })}>{SUPPORTED_LANGUAGES.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}</select></label>
+        <label className="text-[13px] font-semibold">Default language<select className="field mt-2 px-3" value={form.preferredLanguage} onChange={(event) => setForm({ ...form, preferredLanguage: event.target.value })}>{!preferredLanguageAvailable && <option value={form.preferredLanguage} disabled>{getLanguageLabel(form.preferredLanguage)} (unavailable with {providerInfo.label})</option>}{languageOptions.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}</select></label>
         <label className="text-[13px] font-semibold">Preferred output<select className="field mt-2 px-3" value={form.preferredAudioFormat} onChange={(event) => setForm({ ...form, preferredAudioFormat: event.target.value })}><option value="wav">WAV</option><option value="mp3">MP3</option></select></label>
         <label className="text-[13px] font-semibold">Theme<select className="field mt-2 px-3" value={form.theme} onChange={(event) => setForm({ ...form, theme: event.target.value as Account["theme"] })}><option value="DARK">Dark</option><option value="LIGHT">Light</option><option value="SYSTEM">System</option></select></label>
         <label className="text-[13px] font-semibold"><span className="flex items-center gap-2">Retention preference{!operations.retentionWorkerEnabled && <span className="status-badge">Inactive</span>}</span><select className="field mt-2 px-3" aria-describedby="retention-status" value={operations.retentionWorkerEnabled ? form.retentionDays : "none"} disabled={!operations.retentionWorkerEnabled} onChange={(event) => setForm({ ...form, retentionDays: event.target.value })}><option value="none">Keep until I delete</option><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option></select></label>

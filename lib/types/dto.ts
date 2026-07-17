@@ -1,3 +1,5 @@
+import type { SupportedLanguage } from "@/lib/languages";
+
 export type VoiceDto = {
   id: string;
   provider: string;
@@ -23,6 +25,8 @@ export type ProviderInfoDto = {
   capabilities: {
     instantClone: boolean;
     multilingual: boolean;
+    cloneLanguages: SupportedLanguage[];
+    generationLanguages: SupportedLanguage[];
   };
 };
 

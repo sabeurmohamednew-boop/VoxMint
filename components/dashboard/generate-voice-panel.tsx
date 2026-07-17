@@ -9,7 +9,7 @@ import { AppSelect } from "@/components/ui/app-select";
 import { AutosizeTextarea } from "@/components/ui/autosize-textarea";
 import { useToast } from "@/components/ui/toast";
 import { fetchJson } from "@/lib/api/client";
-import { isVoiceCompatibleWithProvider } from "@/lib/providers/compatibility";
+import { isVoiceCompatibleWithProvider, isVoiceLanguageSupported } from "@/lib/providers/compatibility";
 import type { GenerationDto, ProviderInfoDto, UsageDto, VoiceDto } from "@/lib/types/dto";
 
 const MAX_CHARACTERS = 5000;
@@ -51,9 +51,10 @@ export function GenerateVoicePanel({
       voices.filter(
         (voice) =>
           voice.status === "READY" &&
-          isVoiceCompatibleWithProvider(voice.provider, providerInfo.name),
+          isVoiceCompatibleWithProvider(voice.provider, providerInfo.name) &&
+          isVoiceLanguageSupported(voice.primaryLanguage, providerInfo.capabilities.generationLanguages),
       ),
-    [providerInfo.name, voices],
+    [providerInfo.capabilities.generationLanguages, providerInfo.name, voices],
   );
   const selected = useMemo(
     () => selectableVoices.find((voice) => voice.id === selectedVoiceId) ?? null,

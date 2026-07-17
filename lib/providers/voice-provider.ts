@@ -10,6 +10,7 @@ export type ProviderCapabilities = {
   styles: readonly string[];
   outputFormats: readonly string[];
   cloneLanguages: readonly SupportedLanguage[];
+  generationLanguages: readonly SupportedLanguage[];
 };
 
 export type CloneVoiceInput = {

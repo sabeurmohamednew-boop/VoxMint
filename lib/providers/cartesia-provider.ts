@@ -2,7 +2,7 @@ import "server-only";
 
 import Cartesia, { toFile } from "@cartesia/cartesia-js";
 import { getEnv } from "@/lib/config/env";
-import { SUPPORTED_LANGUAGE_CODES } from "@/lib/languages";
+import { getCartesiaLanguageCapabilities } from "@/lib/languages";
 import {
   ProviderAuthenticationError,
   ProviderRateLimitError,
@@ -11,7 +11,7 @@ import {
   ProviderUnknownError,
   ProviderValidationError,
 } from "@/lib/providers/errors";
-import type { VoiceProvider } from "@/lib/providers/voice-provider";
+import type { ProviderCapabilities, VoiceProvider } from "@/lib/providers/voice-provider";
 
 function mapCartesiaError(error: unknown): never {
   if (error instanceof Cartesia.APIConnectionTimeoutError) throw new ProviderTimeoutError(error.message);
@@ -26,15 +26,7 @@ function mapCartesiaError(error: unknown): never {
 
 export class CartesiaVoiceProvider implements VoiceProvider {
   readonly name = "cartesia";
-  readonly capabilities = {
-    instantClone: true,
-    deletion: true,
-    rename: true,
-    multilingual: true,
-    styles: ["normal"],
-    outputFormats: ["wav", "mp3"],
-    cloneLanguages: SUPPORTED_LANGUAGE_CODES,
-  } as const;
+  readonly capabilities: ProviderCapabilities;
   private readonly client: Cartesia;
   private readonly model: string;
 
@@ -42,6 +34,16 @@ export class CartesiaVoiceProvider implements VoiceProvider {
     const env = getEnv();
     if (!env.CARTESIA_API_KEY) throw new ProviderAuthenticationError("CARTESIA_API_KEY is missing.");
     this.model = env.CARTESIA_TTS_MODEL;
+    const languageCapabilities = getCartesiaLanguageCapabilities(this.model);
+    this.capabilities = {
+      instantClone: true,
+      deletion: true,
+      rename: true,
+      multilingual: languageCapabilities.generationLanguages.length > 1,
+      styles: ["normal"],
+      outputFormats: ["wav", "mp3"],
+      ...languageCapabilities,
+    };
     this.client = new Cartesia({
       apiKey: env.CARTESIA_API_KEY,
       timeout: 30_000,

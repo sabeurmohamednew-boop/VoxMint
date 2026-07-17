@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cloneMetadataSchema, generationSchema, languageSchema, voiceNameSchema } from "@/lib/validation/schemas";
+import { cloneMetadataSchema, generationSchema, languageSchema, updateAccountSchema, voiceNameSchema } from "@/lib/validation/schemas";
 
 describe("voice name validation", () => {
   it.each(["Studio Voice", "Voix Française", "Maya's Voice", "Voice-02"])("accepts %s", (name) => {
@@ -23,7 +23,7 @@ describe("generation validation", () => {
 });
 
 describe("language validation", () => {
-  it.each(["en", "fr", "ar", "hi"])("accepts supported language %s", (language) => {
+  it.each(["en", "fr", "ar", "hi"])("accepts known product language %s", (language) => {
     expect(languageSchema.parse(language)).toBe(language);
   });
 
@@ -42,7 +42,10 @@ describe("language validation", () => {
     }).language).toBe("hi");
   });
 
-  it("still rejects unsupported language codes", () => {
+  it("rejects unknown direct API language codes across mutation schemas", () => {
     expect(languageSchema.safeParse("xx").success).toBe(false);
+    expect(cloneMetadataSchema.safeParse({ name: "Unknown Language", language: "xx", consent: "true" }).success).toBe(false);
+    expect(generationSchema(20).safeParse({ voiceId: "cm00000000000000000000000", text: "hello", language: "xx", style: "normal", idempotencyKey: "unknown_language" }).success).toBe(false);
+    expect(updateAccountSchema.safeParse({ preferredLanguage: "xx" }).success).toBe(false);
   });
 });

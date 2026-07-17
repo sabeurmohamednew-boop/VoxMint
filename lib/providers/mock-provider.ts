@@ -1,6 +1,6 @@
 import "server-only";
 
-import { SUPPORTED_LANGUAGE_CODES } from "@/lib/languages";
+import { MOCK_LANGUAGE_CODES } from "@/lib/languages";
 import type { CloneVoiceInput, SynthesizeInput, VoiceProvider } from "@/lib/providers/voice-provider";
 
 function createWav(durationMs: number): Uint8Array {
@@ -44,7 +44,8 @@ export class MockVoiceProvider implements VoiceProvider {
     multilingual: true,
     styles: ["normal"],
     outputFormats: ["wav"],
-    cloneLanguages: SUPPORTED_LANGUAGE_CODES,
+    cloneLanguages: MOCK_LANGUAGE_CODES,
+    generationLanguages: MOCK_LANGUAGE_CODES,
   } as const;
 
   async cloneVoice(input: CloneVoiceInput) {
